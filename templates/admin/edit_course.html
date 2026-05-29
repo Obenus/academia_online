@@ -144,8 +144,29 @@
           <input type="url"  name="video_url"   class="input" placeholder="URL YouTube (https://youtu.be/...)"/>
           <textarea          name="description" class="input" rows="2" placeholder="Descripción (opcional)"></textarea>
           <input type="number" name="duration"  class="input" placeholder="Duración en minutos" min="0"/>
+          <input type="number" name="drip_days" class="input" placeholder="Drip: días tras inscripción (0=secuencial)" min="0" value="0"/>
           <input type="text"   name="group_label" class="input" placeholder="Sub-carpeta (opcional, ej: Abril 2026)"/>
           <button type="submit" class="btn btn-primary btn-sm">Añadir lección</button>
+        </form>
+      </details>
+      <details class="text-xs mt-2">
+        <summary class="text-violet-600 cursor-pointer font-medium">+ Cuestionario del módulo</summary>
+        <form method="POST" action="{{ url_for('features.admin_add_quiz', section_id=section.id) }}" class="space-y-2 mt-2 p-2 border rounded-lg" style="border-color:var(--border)">
+          <input type="text" name="quiz_title" class="input" placeholder="Título del cuestionario"/>
+          <input type="number" name="pass_percent" class="input" value="70" min="1" max="100" placeholder="% para aprobar"/>
+          <p class="text-[10px]" style="color:var(--text4)">Pregunta 1 (texto + opciones; indica nº opción correcta 1-4)</p>
+          <input type="text" name="q1_text" class="input" placeholder="Pregunta 1"/>
+          <input type="text" name="q1_o1" class="input" placeholder="Opción 1"/><input type="text" name="q1_o2" class="input" placeholder="Opción 2"/>
+          <input type="number" name="q1_correct" class="input" value="1" min="1" max="4"/>
+          <button type="submit" class="btn btn-secondary btn-sm">Crear cuestionario</button>
+        </form>
+      </details>
+      <details class="text-xs mt-2">
+        <summary class="text-violet-600 cursor-pointer font-medium">+ Tarea / entrega</summary>
+        <form method="POST" action="{{ url_for('features.admin_add_assignment', section_id=section.id) }}" class="space-y-2 mt-2">
+          <input type="text" name="assignment_title" class="input" placeholder="Título de la tarea" required/>
+          <textarea name="assignment_desc" class="input" rows="2" placeholder="Instrucciones"></textarea>
+          <button type="submit" class="btn btn-secondary btn-sm">Crear tarea</button>
         </form>
       </details>
     </div>

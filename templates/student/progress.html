@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Mi progreso{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-xl font-bold mb-6" style="color:var(--text1)">📈 Mi progreso</h1>
+  {% if not rows %}
+  <p class="text-sm" style="color:var(--text3)">Aún no estás inscrito en ningún curso. <a href="{{ url_for('courses') }}" class="text-violet-600">Ver formaciones</a></p>
+  {% else %}
+  <div class="space-y-4">
+    {% for row in rows %}
+    <div class="rounded-xl p-5 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+      <div class="flex justify-between items-start gap-3 flex-wrap">
+        <div>
+          <h2 class="font-bold" style="color:var(--text1)">{{ row.course.title }}</h2>
+          <p class="text-xs mt-1" style="color:var(--text4)">Inscrito {{ row.enrolled_at.strftime('%d/%m/%Y') if row.enrolled_at else '—' }}</p>
+        </div>
+        <span class="text-lg font-bold text-violet-600">{{ row.progress.percent }}%</span>
+      </div>
+      <div class="h-2 bg-zinc-100 rounded-full mt-3 overflow-hidden">
+        <div class="h-full bg-violet-500 rounded-full" style="width:{{ row.progress.percent }}%"></div>
+      </div>
+      <p class="text-xs mt-2" style="color:var(--text3)">{{ row.progress.done }} / {{ row.progress.total }} lecciones</p>
+      <div class="flex flex-wrap gap-2 mt-4">
+        {% if row.progress.last_lesson %}
+        <a href="{{ url_for('learn', course_id=row.course.id, leccion=row.progress.last_lesson.id) }}" class="btn btn-primary btn-sm">Continuar</a>
+        {% else %}
+        <a href="{{ url_for('learn', course_id=row.course.id) }}" class="btn btn-primary btn-sm">Ver curso</a>
+        {% endif %}
+        {% if row.certificate %}
+        <a href="{{ url_for('features.download_certificate', course_id=row.course.id) }}" class="btn btn-secondary btn-sm">🎓 Certificado</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

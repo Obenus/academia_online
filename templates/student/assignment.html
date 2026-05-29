@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}{{ assignment.title }}{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto">
+  <a href="{{ url_for('learn', course_id=course_id) }}" class="text-sm" style="color:var(--text3)">← Volver al curso</a>
+  <h1 class="text-xl font-bold mt-2 mb-2" style="color:var(--text1)">📤 {{ assignment.title }}</h1>
+  {% if assignment.description %}
+  <p class="text-sm mb-4 whitespace-pre-wrap" style="color:var(--text2)">{{ assignment.description }}</p>
+  {% endif %}
+  {% if submission and submission.mentor_feedback %}
+  <div class="rounded-lg p-4 mb-4 bg-blue-50 border border-blue-200">
+    <p class="text-xs font-bold text-blue-800 mb-1">Feedback del mentor ({{ submission.status }})</p>
+    <p class="text-sm text-blue-900 whitespace-pre-wrap">{{ submission.mentor_feedback }}</p>
+  </div>
+  {% endif %}
+  <form method="POST" class="space-y-3">
+    <textarea name="content" class="input" rows="8" required placeholder="Escribe tu entrega aquí...">{% if submission %}{{ submission.content }}{% endif %}</textarea>
+    <button type="submit" class="btn btn-primary w-full justify-center">
+      {% if submission and submission.status == 'returned' %}Reenviar entrega{% else %}Enviar entrega{% endif %}
+    </button>
+  </form>
+</div>
+{% endblock %}

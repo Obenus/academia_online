@@ -32,6 +32,11 @@
       <a href="{{ url_for('admin_plans') }}"          class="btn btn-secondary w-full justify-center">📋 Planes y precios</a>
       <a href="{{ url_for('admin_payments') }}"       class="btn btn-secondary w-full justify-center">💳 Pagos Stripe</a>
       <a href="{{ url_for('admin_subscriptions') }}"  class="btn btn-secondary w-full justify-center">📊 Suscripciones</a>
+      <a href="{{ url_for('features.admin_stats') }}" class="btn btn-secondary w-full justify-center">📈 Estadísticas</a>
+      <a href="{{ url_for('features.admin_moderation') }}" class="btn btn-secondary w-full justify-center">🛡 Moderación</a>
+      <a href="{{ url_for('features.admin_assignments') }}" class="btn btn-secondary w-full justify-center">📤 Tareas / entregas</a>
+      <a href="{{ url_for('features.admin_export_users_csv') }}" class="btn btn-secondary w-full justify-center">⬇ Exportar usuarios CSV</a>
+      <a href="{{ url_for('features.admin_email_campaigns') }}" class="btn btn-secondary w-full justify-center">📋 Historial emails</a>
     </div>
   </div>
 
@@ -56,8 +61,14 @@
         <input type="text"  name="emoji" class="input w-14 text-center" placeholder="💬" maxlength="2"/>
         <input type="text"  name="name"  class="input flex-1" placeholder="Nombre" required/>
         <input type="color" name="color" value="#7c3aed"
-               class="h-10 w-10 rounded-lg border border-[#d4d4d8] cursor-pointer flex-shrink-0 bg-white"/>
+               class="h-10 w-10 rounded-lg border border border-[#d4d4d8] cursor-pointer flex-shrink-0 bg-white"/>
       </div>
+      <select name="required_plan_id" class="input text-sm">
+        <option value="">Todos los planes</option>
+        {% for p in all_plans %}
+        <option value="{{ p.id }}">Solo plan: {{ p.name }}</option>
+        {% endfor %}
+      </select>
       <button type="submit" class="btn btn-secondary btn-sm">Añadir categoría</button>
     </form>
   </div>

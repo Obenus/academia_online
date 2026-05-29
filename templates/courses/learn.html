@@ -17,9 +17,9 @@
       <h2 class="text-sm font-bold text-[#18181b] truncate">{{ course.title }}</h2>
 
       {% set total = course.lesson_count %}
-      {% set done  = completed_ids | length %}
+      {% set done  = progress.done if progress is defined else (completed_ids | length) %}
       {% if total > 0 %}
-      {% set pct = ((done/total)*100)|round|int %}
+      {% set pct = progress.percent if progress is defined else (((done/total)*100)|round|int) %}
       <div class="mt-2">
         <div class="flex justify-between text-[10px] text-[#a1a1aa] mb-1">
           <span id="progress-label">{{ done }} de {{ total }} completadas</span>
@@ -31,6 +31,14 @@
                data-total="{{ total }}" data-done="{{ done }}"></div>
         </div>
       </div>
+      {% endif %}
+      {% if certificate %}
+      <a href="{{ url_for('features.download_certificate', course_id=course.id) }}"
+         class="mt-2 block text-center text-xs font-semibold text-green-700 bg-green-50 py-2 rounded-lg">
+        🎓 Descargar certificado
+      </a>
+      {% elif progress is defined and progress.percent == 100 %}
+      <p class="mt-2 text-[10px] text-center text-[#71717a]">Completa los cuestionarios para obtener el certificado.</p>
       {% endif %}
     </div>
 
@@ -74,16 +82,22 @@
             {% endif %}
           {% endif %}
 
+          {% set unlocked = unlock_map.get(lesson.id, true) if unlock_map is defined else true %}
           {# — lesson row — #}
+          {% if unlocked %}
           <a href="{{ url_for('learn', course_id=course.id, leccion=lesson.id) }}"
              class="flex items-center gap-3 px-4 py-2.5 transition
              {% if is_active %}bg-amber-50 border-r-2 border-amber-400
              {% else %}hover:bg-[#fafafa]{% endif %}">
+          {% else %}
+          <div class="flex items-center gap-3 px-4 py-2.5 opacity-50 cursor-not-allowed">
+          {% endif %}
             <span class="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px]
               {% if is_done %}bg-green-100 text-green-600
               {% elif is_active %}bg-amber-100 text-amber-600
+              {% elif not unlocked %}bg-zinc-200 text-zinc-500
               {% else %}bg-[#f4f4f5] text-[#a1a1aa]{% endif %}">
-              {% if is_done %}✓{% elif is_active %}▶{% else %}{{ ns2.l_idx }}{% endif %}
+              {% if is_done %}✓{% elif not unlocked %}🔒{% elif is_active %}▶{% else %}{{ ns2.l_idx }}{% endif %}
             </span>
             <div class="flex-1 min-w-0">
               <p class="text-xs truncate
@@ -93,9 +107,22 @@
               {% if lesson.duration_min %}
               <p class="text-[10px] text-[#a1a1aa]">{{ lesson.duration_min }} min</p>
               {% endif %}
+              {% if not unlocked %}<p class="text-[10px] text-amber-600">Bloqueada</p>{% endif %}
             </div>
-          </a>
+          {% if unlocked %}</a>{% else %}</div>{% endif %}
           {% endfor %}
+          {% if section_quizzes is defined and section_quizzes.get(section.id) %}
+          <a href="{{ url_for('features.take_quiz', course_id=course.id, quiz_id=section_quizzes[section.id].id) }}"
+             class="flex items-center gap-2 px-4 py-2 text-xs font-medium text-violet-700 hover:bg-violet-50">
+            📝 Cuestionario: {{ section_quizzes[section.id].title }}
+          </a>
+          {% endif %}
+          {% if section_assignments is defined and section_assignments.get(section.id) %}
+          <a href="{{ url_for('features.submit_assignment', course_id=course.id, assignment_id=section_assignments[section.id].id) }}"
+             class="flex items-center gap-2 px-4 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50">
+            📤 Tarea: {{ section_assignments[section.id].title }}
+          </a>
+          {% endif %}
           {% if ns2.group_open %}</div></details>{% endif %}
         </div>
       </details>

@@ -30,6 +30,12 @@
         </div>
         <h1 class="text-lg font-bold text-[#18181b] mb-1" id="post-title-display">{{ post.title }}</h1>
         <div class="text-[#52525b] text-sm leading-relaxed whitespace-pre-wrap" id="post-content-display">{{ post.content }}</div>
+        {% if not post.is_hidden %}
+        <form method="POST" action="{{ url_for('features.report_post', post_id=post.id) }}" class="mt-3">
+          <input type="text" name="reason" class="input text-xs" placeholder="Motivo del reporte (opcional)"/>
+          <button type="submit" class="text-xs text-red-600 mt-1 hover:underline">🚩 Reportar publicación</button>
+        </form>
+        {% endif %}
 
         <div class="flex items-center gap-4 mt-5 pt-4 border-t border-[#f4f4f5] flex-wrap">
           <button onclick="toggleLike({{ post.id }})"

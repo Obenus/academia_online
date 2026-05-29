@@ -1,6 +1,9 @@
 flask>=3.0
 flask-sqlalchemy>=3.1
 flask-login>=0.6
+flask-wtf>=1.2
+flask-limiter>=3.5
+flask-talisman>=1.1
 werkzeug>=3.0
 stripe>=8.0
 gunicorn>=21.0
@@ -9,3 +12,4 @@ flask-mail>=0.10
 Pillow>=10.0
 boto3
 cryptography
+reportlab>=4.0

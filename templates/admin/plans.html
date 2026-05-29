@@ -34,10 +34,18 @@
             <label class="block text-xs mb-1" style="color:var(--text3)">Precio mensual (€)</label>
             <input type="text" name="plan_price" class="input" value="{{ '%.2f'|format(p.price_monthly) }}" required/>
           </div>
+          <div>
+            <label class="block text-xs mb-1" style="color:var(--text3)">Precio anual (€)</label>
+            <input type="text" name="plan_price_yearly" class="input" value="{{ '%.2f'|format(p.price_yearly or 0) }}"/>
+          </div>
         </div>
-        <div>
-          <label class="block text-xs mb-1" style="color:var(--text3)">Stripe Price ID (opcional)</label>
-          <input type="text" name="plan_stripe_price_id" class="input" value="{{ p.stripe_price_id or '' }}" placeholder="price_xxx"/>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <input type="text" name="plan_stripe_price_id" class="input" value="{{ p.stripe_price_id or '' }}" placeholder="Stripe Price ID mensual"/>
+          <input type="text" name="plan_stripe_price_id_yearly" class="input" value="{{ p.stripe_price_id_yearly or '' }}" placeholder="Stripe Price ID anual"/>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <input type="number" name="trial_days" class="input" value="{{ p.trial_days or 0 }}" min="0" placeholder="Días prueba gratis"/>
+          <input type="text" name="stripe_coupon_id" class="input" value="{{ p.stripe_coupon_id or '' }}" placeholder="Cupón/código Stripe por defecto"/>
         </div>
         <div>
           <label class="block text-xs mb-1" style="color:var(--text3)">Descripción</label>
@@ -72,8 +80,12 @@
     <div class="grid sm:grid-cols-2 gap-3">
       <input type="text" name="plan_name" class="input" placeholder="Nombre del plan *" required/>
       <input type="text" name="plan_price" class="input" placeholder="Precio mensual (€) *" required/>
+      <input type="text" name="plan_price_yearly" class="input" placeholder="Precio anual (€)"/>
     </div>
-    <input type="text" name="plan_stripe_price_id" class="input" placeholder="Stripe Price ID (opcional)"/>
+    <input type="text" name="plan_stripe_price_id" class="input" placeholder="Stripe Price ID mensual"/>
+    <input type="text" name="plan_stripe_price_id_yearly" class="input" placeholder="Stripe Price ID anual"/>
+    <input type="number" name="trial_days" class="input" placeholder="Días prueba gratis" min="0" value="0"/>
+    <input type="text" name="stripe_coupon_id" class="input" placeholder="Cupón Stripe por defecto (opcional)"/>
     <textarea name="plan_description" class="input" rows="2" placeholder="Descripción para el registro"></textarea>
     <button type="submit" class="btn btn-primary">Crear plan</button>
   </form>

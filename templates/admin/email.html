@@ -7,7 +7,11 @@
     <a href="{{ url_for('admin_dashboard') }}" class="text-sm hover:underline" style="color:var(--text3)">← Admin</a>
     <span style="color:var(--text4)">/</span>
     <h1 class="text-xl font-bold" style="color:var(--text1)">📧 Enviar email a alumnos</h1>
+    <a href="{{ url_for('features.admin_email_campaigns') }}" class="text-sm text-violet-600">Historial →</a>
   </div>
+  <p class="text-xs mb-4 px-3 py-2 rounded-lg" style="background:var(--hover-bg);color:var(--text3)">
+    Envío por tandas de {{ batch_size|default(50) }} destinatarios con pausa entre lotes. Cada envío queda registrado en el historial.
+  </p>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}{% for cat, msg in messages %}

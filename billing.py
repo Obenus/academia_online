@@ -194,20 +194,31 @@ def sync_stripe_subscription(app, user, subscription_obj):
     return status
 
 
-def create_subscription_checkout(app, user, plan, success_url, cancel_url):
+def create_subscription_checkout(
+    app, user, plan, success_url, cancel_url,
+    billing_interval='month', promotion_code=None,
+):
     import stripe
     stripe.api_key = get_stripe_secret(app)
+    interval = 'year' if billing_interval == 'year' else 'month'
     line_item = {'quantity': 1}
-    if plan.stripe_price_id:
-        line_item['price'] = plan.stripe_price_id
+    price_id = plan.stripe_price_id_yearly if interval == 'year' else plan.stripe_price_id
+    unit_price = plan.price_yearly if interval == 'year' else plan.price_monthly
+    if price_id:
+        line_item['price'] = price_id
     else:
         line_item['price_data'] = {
             'currency': 'eur',
-            'recurring': {'interval': 'month'},
+            'recurring': {'interval': interval},
             'product_data': {'name': plan.name, 'description': (plan.description or '')[:200]},
-            'unit_amount': int(round(plan.price_monthly * 100)),
+            'unit_amount': int(round((unit_price or 0) * 100)),
         }
-    session = stripe.checkout.Session.create(
+    sub_data = {'metadata': {'user_id': str(user.id), 'plan_id': str(plan.id)}}
+    trial_days = getattr(plan, 'trial_days', 0) or 0
+    if trial_days > 0:
+        sub_data['trial_period_days'] = trial_days
+
+    kwargs = dict(
         mode='subscription',
         payment_method_types=['card'],
         line_items=[line_item],
@@ -215,12 +226,55 @@ def create_subscription_checkout(app, user, plan, success_url, cancel_url):
         cancel_url=cancel_url,
         client_reference_id=str(user.id),
         customer_email=user.email,
-        metadata={
-            'user_id': str(user.id),
-            'plan_id': str(plan.id),
-        },
-        subscription_data={
-            'metadata': {'user_id': str(user.id), 'plan_id': str(plan.id)},
-        },
+        metadata={'user_id': str(user.id), 'plan_id': str(plan.id)},
+        subscription_data=sub_data,
     )
+    coupon = (promotion_code or '').strip() or (getattr(plan, 'stripe_coupon_id', '') or '').strip()
+    if coupon:
+        if coupon.startswith('promo_'):
+            kwargs['discounts'] = [{'promotion_code': coupon}]
+        else:
+            kwargs['discounts'] = [{'coupon': coupon}]
+
+    session = stripe.checkout.Session.create(**kwargs)
     return session
+
+
+def create_billing_portal_session(app, user, return_url):
+    import stripe
+    stripe.api_key = get_stripe_secret(app)
+    if not user.stripe_customer_id:
+        if not user.email:
+            raise ValueError('Usuario sin email')
+        cust = stripe.Customer.create(
+            email=user.email,
+            name=user.username,
+            metadata={'user_id': str(user.id)},
+        )
+        user.stripe_customer_id = cust.id
+        from models import db
+        db.session.commit()
+    return stripe.billing_portal.Session.create(
+        customer=user.stripe_customer_id,
+        return_url=return_url,
+    )
+
+
+def send_test_template_email(app, mail, to_email, subject_tpl, body_tpl, sample_ctx=None):
+    s = _payment_settings(app)
+    academy = (s.academy_name if s and s.academy_name else None) or app.config.get('ACADEMY_NAME', 'Academia')
+    ctx = sample_ctx or {
+        'username': 'UsuarioPrueba',
+        'email': to_email,
+        'plan_name': 'Plan Ejemplo',
+        'plan_price': '29.00 €/mes',
+        'academy_name': academy,
+        'login_url': 'https://ejemplo.com/login',
+        'approval_note': '<p>(Nota de prueba)</p>',
+        'bio': 'Bio de ejemplo',
+        'created_at': '01/01/2026 10:00',
+        'status': 'Activo',
+    }
+    subject = render_template_vars(subject_tpl, **ctx)
+    inner = render_template_vars(body_tpl, **ctx)
+    return send_html_email(app, mail, [to_email], subject, email_wrapper(academy, inner))

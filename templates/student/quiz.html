@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}{{ quiz.title }}{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto">
+  <a href="{{ url_for('learn', course_id=course.id) }}" class="text-sm" style="color:var(--text3)">← Volver al curso</a>
+  <h1 class="text-xl font-bold mt-2 mb-4" style="color:var(--text1)">📝 {{ quiz.title }}</h1>
+  <p class="text-sm mb-4" style="color:var(--text3)">Necesitas {{ quiz.pass_percent }}% para aprobar.</p>
+  <form method="POST" class="space-y-6">
+    {% for q in quiz.questions %}
+    <div class="rounded-xl p-4" style="background:var(--surface);border:1px solid var(--border)">
+      <p class="font-medium text-sm mb-3" style="color:var(--text1)">{{ loop.index }}. {{ q.text }}</p>
+      <div class="space-y-2">
+        {% for opt in q.options %}
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="radio" name="q_{{ q.id }}" value="{{ opt.id }}" required class="accent-violet-600"/>
+          {{ opt.text }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary w-full justify-center">Enviar respuestas</button>
+  </form>
+</div>
+{% endblock %}

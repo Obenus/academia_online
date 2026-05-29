@@ -1,0 +1,1 @@
+# Blueprints de funcionalidades extendidas

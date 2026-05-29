@@ -45,6 +45,18 @@
     </form>
   </div>
 
+  <div class="rounded-xl p-6 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+    <h2 class="text-sm font-bold mb-3" style="color:var(--text1)">✉️ Email de prueba (plantillas)</h2>
+    <form method="POST" action="{{ url_for('features.admin_test_email') }}" class="space-y-3">
+      <input type="email" name="test_email" class="input" placeholder="Email destino (vacío = el tuyo)" value="{{ current_user.email }}"/>
+      <select name="which" class="input text-sm">
+        <option value="welcome">Bienvenida alumno</option>
+        <option value="admin">Aviso nuevo registro (admin)</option>
+      </select>
+      <button type="submit" class="btn btn-secondary btn-sm">Enviar prueba</button>
+    </form>
+  </div>
+
   <a href="{{ url_for('admin_plans') }}" class="btn btn-primary w-full justify-center">📋 Gestionar planes y precios →</a>
   <a href="{{ url_for('admin_subscriptions') }}" class="btn btn-secondary w-full justify-center mt-2">Ver control de suscripciones →</a>
 </div>

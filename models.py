@@ -74,7 +74,11 @@ class SubscriptionPlan(db.Model):
     name            = db.Column(db.String(120), nullable=False)
     description     = db.Column(db.Text, default='')
     price_monthly   = db.Column(db.Float, default=0.0)
+    price_yearly    = db.Column(db.Float, default=0.0)
     stripe_price_id = db.Column(db.String(120), default='')
+    stripe_price_id_yearly = db.Column(db.String(120), default='')
+    trial_days      = db.Column(db.Integer, default=0)
+    stripe_coupon_id = db.Column(db.String(120), default='')
     is_active       = db.Column(db.Boolean, default=True)
     sort_order      = db.Column(db.Integer, default=0)
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
@@ -85,6 +89,8 @@ class Category(db.Model):
     name  = db.Column(db.String(50), unique=True, nullable=False)
     color = db.Column(db.String(20), default='#6366f1')
     emoji = db.Column(db.String(10), default='💬')
+    required_plan_id = db.Column(db.Integer, db.ForeignKey('subscription_plan.id'), nullable=True)
+    required_plan = db.relationship('SubscriptionPlan', backref='categories', lazy=True)
     posts = db.relationship('Post', backref='category', lazy=True)
 
 
@@ -96,6 +102,8 @@ class Post(db.Model):
     content     = db.Column(db.Text, nullable=False)
     created_at  = db.Column(db.DateTime, default=datetime.utcnow)
     pinned      = db.Column(db.Boolean, default=False)
+    is_hidden   = db.Column(db.Boolean, default=False)
+    hidden_reason = db.Column(db.String(300), default='')
 
     likes    = db.relationship('User', secondary=post_likes,
                                backref=db.backref('liked_posts', lazy=True))
@@ -126,6 +134,7 @@ class Course(db.Model):
     price        = db.Column(db.Float, default=0.0)
     order        = db.Column(db.Integer, default=0)
     is_published = db.Column(db.Boolean, default=False)
+    certificate_enabled = db.Column(db.Boolean, default=True)
     created_at   = db.Column(db.DateTime, default=datetime.utcnow)
 
     sections    = db.relationship('Section', backref='course', lazy=True,
@@ -154,6 +163,8 @@ class Section(db.Model):
     lessons   = db.relationship('Lesson', backref='section', lazy=True,
                                 order_by='Lesson.order',
                                 cascade='all, delete-orphan')
+    quizzes     = db.relationship('Quiz', backref='section', lazy=True, cascade='all, delete-orphan')
+    assignments = db.relationship('Assignment', backref='section', lazy=True, cascade='all, delete-orphan')
 
 
 class Lesson(db.Model):
@@ -165,6 +176,7 @@ class Lesson(db.Model):
     order        = db.Column(db.Integer, default=0)
     duration_min = db.Column(db.Integer, default=0)
     group_label  = db.Column(db.String(200), nullable=True)
+    drip_days    = db.Column(db.Integer, default=0)
     files        = db.relationship('LessonFile', backref='lesson', lazy=True,
                                    cascade='all, delete-orphan')
 
@@ -266,3 +278,101 @@ class LiveClass(db.Model):
     instructor   = db.Column(db.String(100), default='')
     recurrence   = db.Column(db.String(10), default='none')  # 'none' | 'weekly' | 'monthly'
     parent_id    = db.Column(db.Integer, db.ForeignKey('live_class.id'), nullable=True)
+
+
+class Quiz(db.Model):
+    id           = db.Column(db.Integer, primary_key=True)
+    section_id   = db.Column(db.Integer, db.ForeignKey('section.id'), nullable=False)
+    title        = db.Column(db.String(200), nullable=False)
+    pass_percent = db.Column(db.Integer, default=70)
+    is_required  = db.Column(db.Boolean, default=True)
+    questions    = db.relationship('QuizQuestion', backref='quiz', lazy=True,
+                                   cascade='all, delete-orphan', order_by='QuizQuestion.order')
+
+
+class QuizQuestion(db.Model):
+    id         = db.Column(db.Integer, primary_key=True)
+    quiz_id    = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
+    text       = db.Column(db.Text, nullable=False)
+    order      = db.Column(db.Integer, default=0)
+    options    = db.relationship('QuizOption', backref='question', lazy=True,
+                                 cascade='all, delete-orphan')
+
+
+class QuizOption(db.Model):
+    id          = db.Column(db.Integer, primary_key=True)
+    question_id = db.Column(db.Integer, db.ForeignKey('quiz_question.id'), nullable=False)
+    text        = db.Column(db.String(500), nullable=False)
+    is_correct  = db.Column(db.Boolean, default=False)
+
+
+class QuizAttempt(db.Model):
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    quiz_id    = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
+    score      = db.Column(db.Integer, default=0)
+    passed     = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Assignment(db.Model):
+    id          = db.Column(db.Integer, primary_key=True)
+    section_id  = db.Column(db.Integer, db.ForeignKey('section.id'), nullable=False)
+    title       = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    submissions = db.relationship('AssignmentSubmission', backref='assignment', lazy=True,
+                                  cascade='all, delete-orphan')
+
+
+class AssignmentSubmission(db.Model):
+    id              = db.Column(db.Integer, primary_key=True)
+    assignment_id   = db.Column(db.Integer, db.ForeignKey('assignment.id'), nullable=False)
+    user_id         = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content         = db.Column(db.Text, nullable=False)
+    mentor_feedback = db.Column(db.Text, default='')
+    status          = db.Column(db.String(20), default='pending')  # pending|reviewed|returned
+    submitted_at    = db.Column(db.DateTime, default=datetime.utcnow)
+    reviewed_at     = db.Column(db.DateTime, nullable=True)
+    user            = db.relationship('User', backref='assignment_submissions', lazy=True)
+
+
+class PostReport(db.Model):
+    id          = db.Column(db.Integer, primary_key=True)
+    post_id     = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+    reporter_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    reason      = db.Column(db.String(500), default='')
+    status      = db.Column(db.String(20), default='pending')
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+    post        = db.relationship('Post', backref='reports', lazy=True)
+    reporter    = db.relationship('User', foreign_keys=[reporter_id], lazy=True)
+
+
+class LiveClassReminderLog(db.Model):
+    id            = db.Column(db.Integer, primary_key=True)
+    live_class_id = db.Column(db.Integer, db.ForeignKey('live_class.id'), nullable=False)
+    user_id       = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    reminder_type = db.Column(db.String(10), nullable=False)  # 24h | 1h
+    sent_at       = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class EmailCampaign(db.Model):
+    id          = db.Column(db.Integer, primary_key=True)
+    admin_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    subject     = db.Column(db.String(300), nullable=False)
+    target      = db.Column(db.String(30), default='students')
+    total_sent  = db.Column(db.Integer, default=0)
+    total_failed= db.Column(db.Integer, default=0)
+    batch_size  = db.Column(db.Integer, default=50)
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class CourseCertificate(db.Model):
+    id               = db.Column(db.Integer, primary_key=True)
+    user_id          = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    course_id        = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
+    certificate_code = db.Column(db.String(32), unique=True, nullable=False)
+    issued_at        = db.Column(db.DateTime, default=datetime.utcnow)
+    user             = db.relationship('User', backref='certificates', lazy=True)
+    course           = db.relationship('Course', backref='certificates', lazy=True)

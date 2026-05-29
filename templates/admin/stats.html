@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Estadísticas{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <a href="{{ url_for('admin_dashboard') }}" class="text-sm" style="color:var(--text3)">← Admin</a>
+  <h1 class="text-xl font-bold my-4" style="color:var(--text1)">📈 Estadísticas</h1>
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
+    {% for label, key in [
+      ('Usuarios', 'users_total'), ('Activos', 'users_active'), ('Pendientes', 'users_pending'),
+      ('Suspendidos', 'users_suspended'), ('Suscripciones OK', 'subs_active'), ('Morosos', 'subs_past_due'),
+      ('Cursos', 'courses'), ('Inscripciones', 'enrollments'), ('Posts', 'posts'),
+      ('Reportes pend.', 'reports_pending'), ('Altas este mes', 'new_users_month'), ('Certificados', 'certificates'),
+      ('Clases próximas', 'live_upcoming')
+    ] %}
+    <div class="rounded-xl p-4" style="background:var(--surface);border:1px solid var(--border)">
+      <p class="text-2xl font-bold" style="color:var(--text1)">{{ stats[key] }}</p>
+      <p class="text-xs" style="color:var(--text3)">{{ label }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  <h2 class="text-sm font-bold mb-3" style="color:var(--text1)">Top cursos por inscripciones</h2>
+  <ul class="space-y-2">
+    {% for course, n in top_courses %}
+    <li class="flex justify-between text-sm rounded-lg px-3 py-2" style="background:var(--hover-bg)">
+      <span>{{ course.title }}</span><span class="font-semibold">{{ n }}</span>
+    </li>
+    {% else %}
+    <li class="text-sm" style="color:var(--text4)">Sin datos</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

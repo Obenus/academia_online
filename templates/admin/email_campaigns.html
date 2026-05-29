@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Historial de emails{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <div class="flex justify-between items-center mb-4">
+    <a href="{{ url_for('admin_dashboard') }}" class="text-sm" style="color:var(--text3)">← Admin</a>
+    <a href="{{ url_for('admin_email') }}" class="btn btn-primary btn-sm">Nuevo envío</a>
+  </div>
+  <h1 class="text-xl font-bold mb-4" style="color:var(--text1)">📋 Historial de campañas</h1>
+  <table class="w-full text-sm">
+    <thead><tr class="text-left" style="color:var(--text3)">
+      <th class="py-2">Fecha</th><th>Asunto</th><th>Enviados</th><th>Fallidos</th><th>Destino</th>
+    </tr></thead>
+    <tbody>
+    {% for c in campaigns %}
+    <tr class="border-t" style="border-color:var(--border)">
+      <td class="py-2">{{ c.created_at.strftime('%d/%m/%Y %H:%M') if c.created_at else '—' }}</td>
+      <td>{{ c.subject[:40] }}</td>
+      <td>{{ c.total_sent }}</td>
+      <td>{{ c.total_failed }}</td>
+      <td>{{ c.target }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="py-4" style="color:var(--text4)">Sin campañas registradas.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

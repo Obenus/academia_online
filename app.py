@@ -18,7 +18,15 @@ from sqlalchemy import text
 
 from models import (db, User, Category, Post, Comment,
                     Course, Section, Lesson, LessonFile, LessonImage, Enrollment, LessonProgress, LiveClass,
-                    SiteSettings, PointEvent, Notification, SubscriptionPlan)
+                    SiteSettings, PointEvent, Notification, SubscriptionPlan,
+                    Quiz, Assignment, PostReport, CourseCertificate)
+from extensions import csrf, limiter, init_security
+from learning_utils import (
+    course_progress, ordered_lessons, completed_lesson_ids,
+    is_lesson_unlocked, issue_certificate,
+)
+from blueprints.features import bp as features_bp, register_bulk_email_routes, user_can_access_category
+from db_migrate import run_migrations
 from backup_manager import run_backup, encrypt_value, decrypt_value, list_local_backups, restore_backup
 from billing import (
     payments_enabled, get_stripe_secret, get_stripe_public, get_stripe_webhook_secret,
@@ -40,6 +48,7 @@ app.config.setdefault('SQLALCHEMY_ENGINE_OPTIONS', {
 
 db.init_app(app)
 mail = Mail(app)
+init_security(app)
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
@@ -196,9 +205,13 @@ def get_settings():
 @app.context_processor
 def inject_settings():
     try:
-        return {'site': get_settings()}
+        from flask_wtf.csrf import generate_csrf
+        return {'site': get_settings(), 'csrf_token': generate_csrf}
     except Exception:
-        return {'site': SiteSettings()}
+        return {'site': SiteSettings(), 'csrf_token': lambda: ''}
+
+app.register_blueprint(features_bp)
+register_bulk_email_routes(app, mail, get_settings)
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
 
@@ -217,6 +230,7 @@ def admin_required(f):
 # ── AUTH ──────────────────────────────────────────────────────────────────────
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit('15 per minute')
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('community'))
@@ -300,6 +314,7 @@ def _finalize_registration_payment(user, plan, session_obj=None):
 
 
 @app.route('/registro', methods=['GET', 'POST'])
+@limiter.limit('10 per hour')
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('community'))
@@ -316,8 +331,11 @@ def register():
         bio      = request.form.get('bio', '').strip()
         avatar   = request.files.get('avatar')
         plan_id  = request.form.get('plan_id', type=int)
+        billing_interval = request.form.get('billing_interval', 'month')
+        promo_code = request.form.get('promo_code', '').strip()
 
-        form = {'username': username, 'email': email, 'bio': bio, 'plan_id': plan_id}
+        form = {'username': username, 'email': email, 'bio': bio, 'plan_id': plan_id,
+                'billing_interval': billing_interval, 'promo_code': promo_code}
 
         if not username or len(username) < 3:
             errors['username'] = 'El nombre debe tener al menos 3 caracteres.'
@@ -369,6 +387,8 @@ def register():
                             success_url=url_for('register_checkout_success', _external=True)
                                       + '?session_id={CHECKOUT_SESSION_ID}',
                             cancel_url=url_for('register', _external=True),
+                            billing_interval=billing_interval,
+                            promotion_code=promo_code or None,
                         )
                         return redirect(session.url)
                     except Exception as e:
@@ -524,11 +544,11 @@ def account_settings():
 @login_required
 def community():
     cat_id = request.args.get('cat', type=int)
-    q = Post.query.order_by(Post.pinned.desc(), Post.created_at.desc())
+    q = Post.query.filter_by(is_hidden=False).order_by(Post.pinned.desc(), Post.created_at.desc())
     if cat_id:
         q = q.filter_by(category_id=cat_id)
     posts      = q.limit(50).all()
-    categories = Category.query.all()
+    categories = [c for c in Category.query.all() if user_can_access_category(current_user, c)]
     five_min_ago  = datetime.utcnow() - timedelta(minutes=5)
     month_start   = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0)
     member_count  = User.query.count()
@@ -566,6 +586,10 @@ def new_post():
         if not title or not content:
             flash('Título y contenido son obligatorios.', 'error')
         else:
+            cat = Category.query.get(category_id) if category_id else None
+            if cat and not user_can_access_category(current_user, cat):
+                flash('No tienes acceso a esta categoría con tu plan actual.', 'error')
+                return render_template('community/new_post.html', categories=categories)
             post = Post(user_id=current_user.id, title=title,
                         content=content, category_id=category_id)
             db.session.add(post)
@@ -578,6 +602,8 @@ def new_post():
 @login_required
 def post_detail(post_id):
     post = Post.query.get_or_404(post_id)
+    if post.is_hidden and not current_user.is_admin and post.user_id != current_user.id:
+        abort(404)
     if request.method == 'POST':
         content = request.form.get('content', '').strip()
         if content:
@@ -757,27 +783,51 @@ def learn(course_id):
             return redirect(url_for('course_detail', course_id=course_id))
 
     lesson_id      = request.args.get('leccion', type=int)
+    lessons_ordered = ordered_lessons(course)
+    completed_ids = completed_lesson_ids(current_user.id)
+    unlock_map = {}
+    for les in lessons_ordered:
+        ok, _msg = is_lesson_unlocked(current_user, les, course, completed_ids)
+        unlock_map[les.id] = ok
+
     current_lesson = Lesson.query.get(lesson_id) if lesson_id else None
+    if current_lesson and not unlock_map.get(current_lesson.id, True):
+        flash('Esta lección aún no está disponible.', 'error')
+        current_lesson = None
     if not current_lesson:
-        for section in course.sections:
-            if section.lessons:
-                current_lesson = section.lessons[0]
+        for les in lessons_ordered:
+            if unlock_map.get(les.id, True):
+                current_lesson = les
                 break
 
-    completed_ids = {p.lesson_id for p in
-                     LessonProgress.query.filter_by(user_id=current_user.id).all()}
+    prog = course_progress(current_user.id, course)
+    cert = CourseCertificate.query.filter_by(
+        user_id=current_user.id, course_id=course.id).first()
+    section_quizzes = {s.id: Quiz.query.filter_by(section_id=s.id).first() for s in course.sections}
+    section_assignments = {s.id: Assignment.query.filter_by(section_id=s.id).first() for s in course.sections}
     return render_template('courses/learn.html',
                            course=course,
                            current_lesson=current_lesson,
-                           completed_ids=completed_ids)
+                           completed_ids=completed_ids,
+                           unlock_map=unlock_map,
+                           progress=prog,
+                           certificate=cert,
+                           section_quizzes=section_quizzes,
+                           section_assignments=section_assignments)
 
 @app.route('/cursos/<int:course_id>/completar/<int:lesson_id>', methods=['POST'])
 @login_required
 def complete_lesson(course_id, lesson_id):
+    course = Course.query.get_or_404(course_id)
+    lesson = Lesson.query.get_or_404(lesson_id)
+    ok, msg = is_lesson_unlocked(current_user, lesson, course)
+    if not ok:
+        return jsonify({'ok': False, 'error': msg}), 403
     if not LessonProgress.query.filter_by(user_id=current_user.id, lesson_id=lesson_id).first():
         db.session.add(LessonProgress(user_id=current_user.id, lesson_id=lesson_id))
         db.session.commit()
         award_points(current_user.id, 'lesson', lesson_id, 3)
+        issue_certificate(current_user, course)
     return jsonify({'ok': True})
 
 # ── LEADERBOARD ───────────────────────────────────────────────────────────────
@@ -932,18 +982,18 @@ def checkout_success():
 
 
 @app.route('/webhooks/stripe', methods=['POST'])
+@csrf.exempt
+@limiter.limit('120 per minute')
 def stripe_webhook():
     payload = request.get_data()
     sig = request.headers.get('Stripe-Signature', '')
     wh_secret = get_stripe_webhook_secret(app)
+    if not wh_secret:
+        return jsonify({'error': 'Webhook secret not configured'}), 503
     try:
         import stripe
         stripe.api_key = get_stripe_secret(app)
-        if wh_secret:
-            event = stripe.Webhook.construct_event(payload, sig, wh_secret)
-        else:
-            event = stripe.Event.construct_from(
-                __import__('json').loads(payload), stripe.api_key)
+        event = stripe.Webhook.construct_event(payload, sig, wh_secret)
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -1015,7 +1065,8 @@ def admin_dashboard():
         'enrollments': Enrollment.query.count(),
     }
     categories = Category.query.all()
-    return render_template('admin/dashboard.html', stats=stats, categories=categories)
+    all_plans = SubscriptionPlan.query.filter_by(is_active=True).order_by(SubscriptionPlan.sort_order).all()
+    return render_template('admin/dashboard.html', stats=stats, categories=categories, all_plans=all_plans)
 
 def _compress_image(file_storage, max_w=1200, max_h=1200, quality=82, square=False):
     """
@@ -1264,10 +1315,21 @@ def admin_plans():
         except ValueError:
             price_f = 0.0
         stripe_price = request.form.get('plan_stripe_price_id', '').strip()
+        price_y = request.form.get('plan_price_yearly', '0').replace(',', '.')
+        try:
+            price_y_f = float(price_y)
+        except ValueError:
+            price_y_f = 0.0
+        trial = int(request.form.get('trial_days', 0) or 0)
+        coupon = request.form.get('stripe_coupon_id', '').strip()
         if name:
             db.session.add(SubscriptionPlan(
                 name=name, description=desc, price_monthly=price_f,
-                stripe_price_id=stripe_price, is_active=True,
+                price_yearly=price_y_f,
+                stripe_price_id=stripe_price,
+                stripe_price_id_yearly=request.form.get('plan_stripe_price_id_yearly', '').strip(),
+                trial_days=trial, stripe_coupon_id=coupon,
+                is_active=True,
                 sort_order=SubscriptionPlan.query.count(),
             ))
             db.session.commit()
@@ -1279,7 +1341,11 @@ def admin_plans():
     for p in plans_raw:
         plans.append({
             'id': p.id, 'name': p.name, 'description': p.description,
-            'price_monthly': p.price_monthly, 'stripe_price_id': p.stripe_price_id,
+            'price_monthly': p.price_monthly, 'price_yearly': getattr(p, 'price_yearly', 0) or 0,
+            'stripe_price_id': p.stripe_price_id,
+            'stripe_price_id_yearly': getattr(p, 'stripe_price_id_yearly', '') or '',
+            'trial_days': getattr(p, 'trial_days', 0) or 0,
+            'stripe_coupon_id': getattr(p, 'stripe_coupon_id', '') or '',
             'is_active': p.is_active,
             'users_count': User.query.filter_by(subscription_plan_id=p.id).count(),
         })
@@ -1300,6 +1366,14 @@ def admin_edit_plan(plan_id):
         flash('Precio no válido.', 'error')
         return _redirect_plans()
     plan.stripe_price_id = request.form.get('plan_stripe_price_id', '').strip()
+    py = request.form.get('plan_price_yearly', '0').replace(',', '.')
+    try:
+        plan.price_yearly = float(py)
+    except ValueError:
+        pass
+    plan.stripe_price_id_yearly = request.form.get('plan_stripe_price_id_yearly', '').strip()
+    plan.trial_days = int(request.form.get('trial_days', 0) or 0)
+    plan.stripe_coupon_id = request.form.get('stripe_coupon_id', '').strip()
     db.session.commit()
     flash(f'Plan "{plan.name}" actualizado.', 'success')
     return _redirect_plans()
@@ -1382,8 +1456,9 @@ def admin_new_category():
     name  = request.form.get('name', '').strip()
     color = request.form.get('color', '#6366f1')
     emoji = request.form.get('emoji', '💬')
+    plan_id = request.form.get('required_plan_id', type=int) or None
     if name and not Category.query.filter_by(name=name).first():
-        db.session.add(Category(name=name, color=color, emoji=emoji))
+        db.session.add(Category(name=name, color=color, emoji=emoji, required_plan_id=plan_id))
         db.session.commit()
         flash('Categoría creada.', 'success')
     return redirect(url_for('admin_dashboard'))
@@ -1555,6 +1630,7 @@ def admin_add_lesson(section_id):
             duration_min = int(request.form.get('duration', 0) or 0),
             order        = len(section.lessons),
             group_label  = request.form.get('group_label', '').strip() or None,
+            drip_days    = int(request.form.get('drip_days', 0) or 0),
         ))
         db.session.commit()
         flash('Lección añadida.', 'success')
@@ -1909,54 +1985,6 @@ def admin_reject_user(user_id):
     db.session.commit()
     flash(f'{user.username} ha sido rechazado.', 'success')
     return redirect(url_for('admin_users'))
-
-@app.route('/admin/email', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def admin_email():
-    if request.method == 'POST':
-        subject = request.form.get('subject', '').strip()
-        body    = request.form.get('body', '').strip()
-        target  = request.form.get('target', 'students')
-        if not subject or not body:
-            flash('El asunto y el mensaje son obligatorios.', 'error')
-            return redirect(url_for('admin_email'))
-        if not app.config.get('MAIL_USERNAME'):
-            flash('Email no configurado. Añade MAIL_USERNAME y MAIL_PASSWORD en las variables de entorno de Railway.', 'error')
-            return redirect(url_for('admin_email'))
-        if target == 'all':
-            users = User.query.filter_by(status='active').all()
-        else:
-            users = User.query.filter_by(status='active', role='student').all()
-        try:
-            for user in users:
-                msg = MailMessage(
-                    subject=subject,
-                    recipients=[user.email],
-                    html=f"""
-                    <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-                      <div style="background:#7c3aed;padding:24px;border-radius:12px 12px 0 0;text-align:center">
-                        <h1 style="color:#fff;margin:0;font-size:20px">🎓 Marca Atractora</h1>
-                      </div>
-                      <div style="background:#fff;padding:32px;border:1px solid #e4e4e7;border-top:none;border-radius:0 0 12px 12px">
-                        <h2 style="color:#18181b;margin-top:0">{subject}</h2>
-                        <div style="color:#52525b;line-height:1.7;white-space:pre-wrap">{body}</div>
-                        <hr style="border:none;border-top:1px solid #f4f4f5;margin:24px 0"/>
-                        <p style="color:#a1a1aa;font-size:12px;margin:0">
-                          Estás recibiendo este email porque eres miembro de Marca Atractora.
-                        </p>
-                      </div>
-                    </div>
-                    """
-                )
-                mail.send(msg)
-            flash(f'✅ Email enviado a {len(users)} persona{"s" if len(users) != 1 else ""}.', 'success')
-        except Exception as e:
-            flash(f'Error al enviar el email: {str(e)}', 'error')
-        return redirect(url_for('admin_email'))
-    total_students = User.query.filter_by(status='active', role='student').count()
-    total_all      = User.query.filter_by(status='active').count()
-    return render_template('admin/email.html', total_students=total_students, total_all=total_all)
 
 @app.route('/admin/usuarios/<int:user_id>/rol', methods=['POST'])
 @login_required
@@ -4189,9 +4217,13 @@ with app.app_context():
                     created_at TIMESTAMP DEFAULT NOW()
                 )
             """))
+            run_migrations(conn)
             conn.commit()
     except Exception:
         pass
+    sk = app.config.get('SECRET_KEY', '')
+    if not sk or sk == 'cambiar-en-produccion-secret-key-aqui':
+        print('[SECURITY] ⚠️ SECRET_KEY por defecto — configura secrets/secret_key antes de producción.')
     # ── Diagnóstico de base de datos ──────────────────────────────────────────
     _db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
     if 'postgresql' in _db_uri:

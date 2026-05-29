@@ -15,12 +15,17 @@ def _get_secret(name: str, default: str = '') -> str:
             return value
     return os.environ.get(name, default)
 
-SECRET_KEY = _get_secret('SECRET_KEY', 'cambiar-en-produccion-secret-key-aqui')
-
 def _as_bool(value: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in ('1', 'true', 'yes', 'on')
+
+SECRET_KEY = _get_secret('SECRET_KEY', 'cambiar-en-produccion-secret-key-aqui')
+
+# Cookies de sesión (en producción con HTTPS: SESSION_COOKIE_SECURE=true)
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = _as_bool(os.environ.get('SESSION_COOKIE_SECURE'), False)
 
 # Usar PostgreSQL en Railway, SQLite en local
 _db_url = os.environ.get('DATABASE_URL', 'sqlite:///academy.db')
