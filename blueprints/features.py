@@ -438,11 +438,13 @@ def register_bulk_email_routes(app, mail, get_settings_fn):
             return redirect(url_for('features.admin_email_campaigns'))
         total_students = User.query.filter_by(status='active', role='student').count()
         total_all = User.query.filter_by(status='active').count()
+        site = get_settings_fn()
         return render_template(
             'admin/email.html',
             total_students=total_students,
             total_all=total_all,
             batch_size=BATCH_SIZE,
+            academy_name=(site.academy_name if site and site.academy_name else app.config.get('ACADEMY_NAME', 'Academia')),
         )
 
     return admin_email

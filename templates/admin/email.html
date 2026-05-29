@@ -65,7 +65,17 @@
       <!-- Preview info -->
       <div class="p-4 rounded-lg" style="background:var(--hover-bg);border:1px solid var(--border)">
         <p class="text-xs font-medium mb-1" style="color:var(--text3)">Vista previa del email</p>
-        <p class="text-xs" style="color:var(--text4)">El email se enviará con la cabecera de <strong>Marca Atractora</strong> en violeta y tu mensaje en el cuerpo.</p>
+        <p class="text-xs mb-3" style="color:var(--text4)">El email se enviará con la cabecera de <strong>{{ academy_name }}</strong> en violeta y tu mensaje en el cuerpo.</p>
+        <div class="rounded-xl overflow-hidden" style="border:1px solid #e4e4e7;background:#fff">
+          <div style="background:#7c3aed;padding:14px 16px;text-align:center">
+            <h3 class="text-sm font-bold text-white m-0">🎓 <span id="preview-academy">{{ academy_name }}</span></h3>
+          </div>
+          <div class="p-4">
+            <p id="preview-subject" class="text-sm font-semibold mb-2" style="color:#18181b">Asunto de ejemplo</p>
+            <div id="preview-body" class="text-sm whitespace-pre-wrap" style="color:#52525b">Escribe el mensaje para ver aquí la vista previa.</div>
+            <p class="text-[11px] mt-3" style="color:#a1a1aa">Email de la academia. Lote máx. {{ batch_size|default(50) }} destinatarios.</p>
+          </div>
+        </div>
       </div>
 
       <div class="flex gap-3 justify-end pt-2">
@@ -102,4 +112,27 @@
     </a>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const subjectInput = document.querySelector('input[name="subject"]');
+    const bodyInput = document.querySelector('textarea[name="body"]');
+    const previewSubject = document.getElementById('preview-subject');
+    const previewBody = document.getElementById('preview-body');
+    if (!subjectInput || !bodyInput || !previewSubject || !previewBody) return;
+
+    function updatePreview() {
+      const subject = subjectInput.value.trim();
+      const body = bodyInput.value.trim();
+      previewSubject.textContent = subject || 'Asunto de ejemplo';
+      previewBody.textContent = body || 'Escribe el mensaje para ver aquí la vista previa.';
+    }
+
+    subjectInput.addEventListener('input', updatePreview);
+    bodyInput.addEventListener('input', updatePreview);
+    updatePreview();
+  })();
+</script>
 {% endblock %}
