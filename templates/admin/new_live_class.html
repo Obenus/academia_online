@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Nueva clase en directo{% endblock %}
+
+{% block content %}
+<div class="max-w-lg">
+  <a href="{{ url_for('admin_live_classes') }}" class="text-sm text-[#71717a] hover:text-[#18181b] mb-4 inline-flex items-center gap-1">← Volver</a>
+  <h1 class="text-xl font-bold text-[#18181b] mt-3 mb-6">📅 Programar clase en directo</h1>
+  <div class="bg-white border border-[#e4e4e7] rounded-xl p-6 shadow-sm">
+    <form method="POST" class="space-y-5">
+      <div>
+        <label class="block text-sm font-medium text-[#52525b] mb-1.5">Título *</label>
+        <input type="text" name="title" class="input" placeholder="Ej: Sesión de preguntas y respuestas" required/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-[#52525b] mb-1.5">Descripción</label>
+        <textarea name="description" class="input" rows="3" placeholder="De qué va la sesión..."></textarea>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-[#52525b] mb-1.5">Fecha y hora *</label>
+        <input type="datetime-local" name="scheduled_at" class="input" required/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-[#52525b] mb-1.5">Duración (minutos)</label>
+        <input type="number" name="duration" class="input" value="60" min="5"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-[#52525b] mb-1.5">Instructor</label>
+        <input type="text" name="instructor" class="input" placeholder="Nombre del profesor"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-[#52525b] mb-1.5">Enlace (Meet, Zoom...)</label>
+        <input type="url" name="meet_url" class="input" placeholder="https://meet.google.com/..."/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-[#52525b] mb-1.5">🔁 Recurrencia</label>
+        <select name="recurrence" class="input">
+          <option value="none">Sin recurrencia (una sola vez)</option>
+          <option value="weekly">Cada semana</option>
+          <option value="monthly">Cada mes</option>
+        </select>
+        <p class="text-xs text-[#a1a1aa] mt-1">Se crearán automáticamente las repeticiones para 2 años.</p>
+      </div>
+      <div class="flex gap-3 justify-end pt-2">
+        <a href="{{ url_for('admin_live_classes') }}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary">Programar clase</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

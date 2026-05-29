@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block title %}Control de suscripciones{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+  <div class="flex items-center gap-3">
+    <a href="{{ url_for('admin_payments') }}" class="text-sm" style="color:var(--text3)">← Pagos</a>
+    <h1 class="text-xl font-bold" style="color:var(--text1)">📊 Suscripciones y pagos</h1>
+  </div>
+  <a href="{{ url_for('admin_users') }}" class="btn btn-secondary btn-sm">Gestionar usuarios</a>
+</div>
+
+<div class="rounded-xl overflow-hidden shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);background:var(--hover-bg)">
+          <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Usuario</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Email</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Plan</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Pago</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Cuenta</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Próx. periodo</th>
+          <th class="px-4 py-3 text-right text-xs font-semibold" style="color:var(--text3)">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% set u = row.user %}
+        <tr style="border-bottom:1px solid var(--border)">
+          <td class="px-4 py-3 font-medium" style="color:var(--text1)">{{ u.username }}</td>
+          <td class="px-4 py-3 text-xs" style="color:var(--text3)">{{ u.email }}</td>
+          <td class="px-4 py-3 text-xs">
+            {% if not u.is_admin %}
+            <form method="POST" action="{{ url_for('admin_set_user_plan', user_id=u.id) }}">
+              <select name="plan_id" class="input text-xs" style="width:auto;max-width:130px;padding:4px 8px" onchange="this.form.submit()">
+                <option value="free" {% if u.is_free_billing %}selected{% endif %}>Gratuito</option>
+                <option value="none" {% if not u.is_free_billing and not u.subscription_plan_id %}selected{% endif %}>Sin plan</option>
+                {% for p in all_plans %}
+                <option value="{{ p.id }}" {% if u.subscription_plan_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                {% endfor %}
+              </select>
+            </form>
+            {% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-3">
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium
+              {% if row.payment_label == 'Al día' or row.payment_label == 'Gratuito' %}bg-green-100 text-green-700
+              {% elif row.payment_label == 'Pago pendiente' or row.payment_label == 'Suspendido' %}bg-orange-100 text-orange-600
+              {% else %}bg-zinc-100 text-zinc-600{% endif %}">
+              {{ row.payment_label }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-xs">{{ u.status }}</td>
+          <td class="px-4 py-3 text-xs" style="color:var(--text4)">
+            {% if u.subscription_period_end %}{{ u.subscription_period_end.strftime('%d/%m/%Y') }}{% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex flex-wrap gap-1 justify-end">
+              <form method="POST" action="{{ url_for('admin_set_user_status', user_id=u.id) }}" class="inline-flex gap-1">
+                <select name="status" class="input text-xs" style="width:auto;padding:4px 8px">
+                  <option value="active" {% if u.status=='active' %}selected{% endif %}>Activo</option>
+                  <option value="pending" {% if u.status=='pending' %}selected{% endif %}>Pendiente</option>
+                  <option value="suspended" {% if u.status=='suspended' %}selected{% endif %}>Suspendido</option>
+                  <option value="rejected" {% if u.status=='rejected' %}selected{% endif %}>Rechazado</option>
+                </select>
+                <button type="submit" class="btn btn-secondary btn-sm">OK</button>
+              </form>
+              {% if not u.is_free_billing %}
+              <form method="POST" action="{{ url_for('admin_set_user_free', user_id=u.id) }}" onsubmit="return confirm('¿Marcar como gratuito (sin cobros)?')">
+                <button type="submit" class="btn btn-secondary btn-sm">Gratuito</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,540 @@
+{% extends 'base.html' %}
+{% block title %}{{ course.title }}{% endblock %}
+{% block content_class %}max-w-7xl mx-auto{% endblock %}
+
+{% block content %}
+<div class="flex gap-0 -mx-2 min-h-[80vh]">
+
+  <!-- ── Left panel: accordion sidebar ── -->
+  <div class="w-80 flex-shrink-0 bg-white border border-[#e4e4e7] rounded-xl mr-5 flex flex-col shadow-sm overflow-hidden">
+
+    <!-- Header -->
+    <div class="p-4 border-b border-[#e4e4e7]">
+      <a href="{{ url_for('courses') }}"
+         class="text-xs text-[#71717a] hover:text-[#18181b] inline-flex items-center gap-1 mb-2">
+        ← Volver a formaciones
+      </a>
+      <h2 class="text-sm font-bold text-[#18181b] truncate">{{ course.title }}</h2>
+
+      {% set total = course.lesson_count %}
+      {% set done  = completed_ids | length %}
+      {% if total > 0 %}
+      {% set pct = ((done/total)*100)|round|int %}
+      <div class="mt-2">
+        <div class="flex justify-between text-[10px] text-[#a1a1aa] mb-1">
+          <span id="progress-label">{{ done }} de {{ total }} completadas</span>
+          <span id="progress-pct">{{ pct }}%</span>
+        </div>
+        <div class="h-1.5 bg-[#f4f4f5] rounded-full overflow-hidden">
+          <div id="progress-bar" class="h-full bg-violet-500 rounded-full transition-all"
+               style="width:{{ pct }}%"
+               data-total="{{ total }}" data-done="{{ done }}"></div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Sections accordion -->
+    <div class="overflow-y-auto flex-1">
+      {% for section in course.sections %}
+      {% set s_idx = loop.index %}
+      {% set section_has_active = current_lesson and current_lesson.section_id == section.id %}
+      <details {% if section_has_active %}open{% endif %} class="group border-b border-[#f4f4f5] last:border-0">
+        <summary class="flex items-center gap-2.5 px-4 py-3 cursor-pointer select-none
+                        hover:bg-[#fafafa] transition list-none">
+          <span class="text-[#a1a1aa] group-open:rotate-90 transition-transform duration-150 text-xs">▶</span>
+          <span class="flex-1 text-xs font-semibold text-[#18181b] truncate">{{ section.title }}</span>
+          <span class="text-[10px] text-[#a1a1aa] flex-shrink-0">{{ section.lessons|length }}</span>
+        </summary>
+
+        <div class="pb-1">
+          {% set ns2 = namespace(cur_group='__none__', group_open=false, l_idx=0) %}
+          {% for lesson in section.lessons %}
+          {% set ns2.l_idx = ns2.l_idx + 1 %}
+          {% set is_active = current_lesson and current_lesson.id == lesson.id %}
+          {% set is_done   = lesson.id in completed_ids %}
+          {% set grp = lesson.group_label or '' %}
+
+          {# — open / close sub-group headers — #}
+          {% if grp != ns2.cur_group %}
+            {% if ns2.group_open %}</div></details>{% set ns2.group_open = false %}{% endif %}
+            {% set ns2.cur_group = grp %}
+            {% if grp %}
+            {# check if any lesson in this group is active #}
+            {% set grp_has_active = namespace(v=false) %}
+            {% for ll in section.lessons %}{% if ll.group_label == grp and current_lesson and current_lesson.id == ll.id %}{% set grp_has_active.v = true %}{% endif %}{% endfor %}
+            <details {% if grp_has_active.v %}open{% endif %} class="group/sub border-b border-[#f0f0f0] last:border-0">
+              <summary class="flex items-center gap-2 px-4 py-2 cursor-pointer select-none
+                              hover:bg-[#f4f4f5] transition list-none">
+                <span class="text-[#a1a1aa] group-open/sub:rotate-90 transition-transform duration-150 text-[9px]">▶</span>
+                <span class="flex-1 text-[11px] font-semibold truncate" style="color:var(--text2)">📂 {{ grp }}</span>
+              </summary>
+              <div class="pl-3">
+            {% set ns2.group_open = true %}
+            {% endif %}
+          {% endif %}
+
+          {# — lesson row — #}
+          <a href="{{ url_for('learn', course_id=course.id, leccion=lesson.id) }}"
+             class="flex items-center gap-3 px-4 py-2.5 transition
+             {% if is_active %}bg-amber-50 border-r-2 border-amber-400
+             {% else %}hover:bg-[#fafafa]{% endif %}">
+            <span class="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px]
+              {% if is_done %}bg-green-100 text-green-600
+              {% elif is_active %}bg-amber-100 text-amber-600
+              {% else %}bg-[#f4f4f5] text-[#a1a1aa]{% endif %}">
+              {% if is_done %}✓{% elif is_active %}▶{% else %}{{ ns2.l_idx }}{% endif %}
+            </span>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs truncate
+                {% if is_active %}font-semibold text-[#18181b]
+                {% elif is_done %}text-[#52525b]
+                {% else %}text-[#71717a]{% endif %}">{{ lesson.title }}</p>
+              {% if lesson.duration_min %}
+              <p class="text-[10px] text-[#a1a1aa]">{{ lesson.duration_min }} min</p>
+              {% endif %}
+            </div>
+          </a>
+          {% endfor %}
+          {% if ns2.group_open %}</div></details>{% endif %}
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── Right panel: video + info ── -->
+  <div class="flex-1 min-w-0">
+    {% if current_lesson %}
+
+    <!-- Video player -->
+    <div class="relative mb-4">
+      <div id="video-wrap" class="aspect-video bg-black rounded-xl overflow-hidden shadow-sm">
+        {% if current_lesson.video_url %}
+        <iframe id="video-iframe" src="{{ current_lesson.video_url | youtube_embed }}"
+                class="w-full h-full" allowfullscreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+        </iframe>
+        {% else %}
+        <div class="w-full h-full flex items-center justify-center">
+          <p class="text-[#71717a] text-sm">Sin vídeo — añade un link abajo</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Admin: edit video button (top-right corner over video) -->
+      {% if current_user.is_admin %}
+      <button onclick="toggleVideoEdit()" title="Cambiar vídeo"
+              class="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                     bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition">
+        🎬 Cambiar vídeo
+      </button>
+
+      <!-- Video URL edit panel -->
+      <div id="video-edit" class="hidden mt-2 bg-white border border-[#e4e4e7] rounded-xl p-4 shadow-sm">
+        <p class="text-xs text-[#71717a] mb-2">Pega la URL de Vimeo, YouTube u otro servicio compatible.</p>
+        <div class="flex gap-2">
+          <input id="video-url-input" type="url"
+                 value="{{ current_lesson.video_url }}"
+                 placeholder="https://vimeo.com/… o https://youtu.be/…"
+                 class="input flex-1 text-sm"/>
+          <button onclick="saveVideo()" class="btn btn-primary btn-sm whitespace-nowrap">💾 Guardar</button>
+          <button onclick="toggleVideoEdit()" class="btn btn-secondary btn-sm">Cancelar</button>
+        </div>
+        <p class="text-[10px] text-[#a1a1aa] mt-1.5">Formatos válidos: vimeo.com/ID, youtu.be/ID, youtube.com/watch?v=ID</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Lesson info card -->
+    <div class="bg-white border border-[#e4e4e7] rounded-xl shadow-sm overflow-hidden">
+
+      <!-- Title bar -->
+      <div class="flex items-start justify-between gap-4 p-5 border-b border-[#f4f4f5]">
+        <div class="min-w-0">
+          <p class="text-[11px] text-[#a1a1aa] mb-0.5 uppercase tracking-wide">
+            {% for section in course.sections %}
+              {% if section.id == current_lesson.section_id %}{{ section.title }}{% endif %}
+            {% endfor %}
+          </p>
+          <h1 class="text-lg font-bold text-[#18181b] leading-snug">{{ current_lesson.title }}</h1>
+          {% if current_lesson.duration_min %}
+          <p class="text-xs text-[#a1a1aa] mt-0.5">⏱ {{ current_lesson.duration_min }} minutos</p>
+          {% endif %}
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          {% if current_user.is_admin %}
+          <!-- Edit content button -->
+          <button id="edit-btn" onclick="startEdit()" title="Editar contenido"
+                  class="w-8 h-8 rounded-full border border-[#e4e4e7] flex items-center justify-center
+                         text-[#71717a] hover:border-violet-400 hover:text-violet-600 hover:bg-violet-50 transition text-sm">
+            ✏️
+          </button>
+          <!-- Manage files button -->
+          <button onclick="toggleFilesPanel()" title="Gestionar archivos"
+                  class="w-8 h-8 rounded-full border border-[#e4e4e7] flex items-center justify-center
+                         text-[#71717a] hover:border-violet-400 hover:text-violet-600 hover:bg-violet-50 transition text-sm">
+            📎
+          </button>
+          {% endif %}
+          <div id="done-status" class="flex-shrink-0">
+            {% if current_lesson.id in completed_ids %}
+            <span class="btn btn-secondary">✅ Completada</span>
+            {% else %}
+            <span class="text-xs text-[#a1a1aa] flex items-center gap-1.5">
+              ⏱ <span id="countdown">3:00</span> para completar
+            </span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Description VIEW -->
+      {% set _desc = current_lesson.description or '' %}
+      {% set _has_desc = _desc and _desc not in ('<p><br></p>', '<p></p>', '<br>') %}
+      {% if _has_desc or current_user.is_admin %}
+      <div id="desc-view" class="p-5 {% if _has_desc %}border-b border-[#f4f4f5]{% endif %} lesson-description">
+        {% if _has_desc %}
+          {% if '<' in _desc %}
+            {{ _desc | safe }}
+          {% else %}
+            {% for para in _desc.split('\n\n') %}
+              {% if para.strip() %}<p>{{ para.strip() }}</p>{% endif %}
+            {% endfor %}
+          {% endif %}
+        {% else %}
+          <p class="text-[#a1a1aa] text-sm italic">Sin descripción — haz clic en ✏️ para añadir contenido.</p>
+        {% endif %}
+      </div>
+      {% else %}
+      <div id="desc-view" class="hidden lesson-description"></div>
+      {% endif %}
+
+      <!-- Description EDIT (inline, hidden by default) — admin only -->
+      {% if current_user.is_admin %}
+      <div id="desc-edit" class="hidden border-b border-[#f4f4f5]">
+        <!-- Quill toolbar -->
+        <div id="quill-toolbar" class="border-b border-[#e4e4e7]" style="background:#fafafa">
+          <span class="ql-formats">
+            <select class="ql-header">
+              <option value="2">Título</option>
+              <option value="3">Subtítulo</option>
+              <option selected>Normal</option>
+            </select>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-bold"></button>
+            <button class="ql-italic"></button>
+            <button class="ql-underline"></button>
+          </span>
+          <span class="ql-formats">
+            <select class="ql-color"></select>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-list" value="ordered"></button>
+            <button class="ql-list" value="bullet"></button>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-link"></button>
+            <button class="ql-image" title="Insertar foto"></button>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-clean"></button>
+          </span>
+        </div>
+        <!-- Editor area -->
+        <div id="quill-editor" style="min-height:260px;font-size:14px;"></div>
+        <!-- Save / Cancel bar -->
+        <div class="flex items-center justify-between px-5 py-3 bg-[#fafafa] border-t border-[#f4f4f5]">
+          <span class="text-[11px] text-[#a1a1aa]">📷 Haz clic en el icono de imagen para insertar fotos</span>
+          <div class="flex gap-2">
+            <button onclick="cancelEdit()"
+                    class="btn btn-secondary btn-sm">Cancelar</button>
+            <button onclick="saveEdit()"
+                    class="btn btn-primary btn-sm">💾 Guardar</button>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- File attachments (public view) -->
+      {% if current_lesson.files %}
+      <div id="files-public" class="p-5 {% if current_user.is_admin %}border-b border-[#f4f4f5]{% endif %}">
+        <h3 class="text-xs font-bold text-[#18181b] uppercase tracking-wide mb-3">📎 Recursos adjuntos</h3>
+        <div class="space-y-2">
+          {% for file in current_lesson.files %}
+          <div class="flex items-center gap-3 p-3 rounded-lg border border-[#e4e4e7] hover:border-violet-300 hover:bg-violet-50 transition group">
+            <a href="{{ url_for('serve_lesson_file', file_id=file.id) }}"
+               class="flex items-center gap-3 flex-1 min-w-0">
+              <span class="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center flex-shrink-0 text-sm">📄</span>
+              <span class="text-sm font-medium text-[#18181b] group-hover:text-violet-700 truncate">{{ file.name }}</span>
+              <span class="ml-auto text-xs text-[#a1a1aa] flex-shrink-0">↓</span>
+            </a>
+            {% if current_user.is_admin %}
+            <form method="POST" action="{{ url_for('admin_delete_lesson_file', file_id=file.id) }}">
+              <button type="submit" onclick="return confirm('¿Eliminar {{ file.name }}?')"
+                      class="text-[#a1a1aa] hover:text-red-500 transition text-xs px-1">✕</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Admin files panel (hidden, toggled by 📎 button) -->
+      {% if current_user.is_admin %}
+      <div id="files-panel" class="hidden p-5 bg-[#fafafa]">
+        <p class="text-xs font-semibold text-[#18181b] mb-3">Subir archivo adjunto</p>
+        <form method="POST" action="{{ url_for('admin_add_lesson_file', lesson_id=current_lesson.id) }}"
+              enctype="multipart/form-data" class="flex flex-col gap-2">
+          <input type="text" name="name" class="input" placeholder="Nombre visible (ej: Diapositivas.pdf)" required/>
+          <label class="file-upload" style="position:relative">
+            <input type="file" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.mp3,.png,.jpg,.jpeg" required/>
+            <span class="file-upload-btn">📎 Seleccionar</span>
+            <span class="file-upload-name">Ningún archivo seleccionado</span>
+          </label>
+          <button type="submit" class="btn btn-primary self-start">⬆ Subir archivo</button>
+        </form>
+      </div>
+      {% endif %}
+
+    </div><!-- end lesson info card -->
+
+    <!-- Navigation: prev/next lesson -->
+    {% set ns = namespace(prev=None, next=None, found=False) %}
+    {% for section in course.sections %}
+      {% for lesson in section.lessons %}
+        {% if ns.found and not ns.next %}{% set ns.next = lesson %}{% endif %}
+        {% if lesson.id == current_lesson.id %}{% set ns.found = True %}{% endif %}
+        {% if not ns.found %}{% set ns.prev = lesson %}{% endif %}
+      {% endfor %}
+    {% endfor %}
+
+    <div class="flex justify-between mt-4">
+      {% if ns.prev %}
+      <a href="{{ url_for('learn', course_id=course.id, leccion=ns.prev.id) }}"
+         class="btn btn-secondary text-sm">← Anterior</a>
+      {% else %}<div></div>{% endif %}
+
+      {% if ns.next %}
+      <a href="{{ url_for('learn', course_id=course.id, leccion=ns.next.id) }}"
+         class="btn btn-primary text-sm">Siguiente →</a>
+      {% endif %}
+    </div>
+
+    {% else %}
+    <div class="bg-white border border-[#e4e4e7] rounded-xl p-16 text-center shadow-sm">
+      <p class="text-4xl mb-3">📭</p>
+      <p class="text-[#71717a]">Este curso aún no tiene lecciones.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+async function markDone(lessonId, auto) {
+  await fetch(`/cursos/{{ course.id }}/completar/${lessonId}`, {method:'POST'});
+  const status = document.getElementById('done-status');
+  if (status) {
+    status.innerHTML = '<span class="btn btn-secondary">✅ Completada</span>';
+  }
+  // Update sidebar check for this lesson
+  const sideLink = document.querySelector(`[data-lesson-id="{{ current_lesson.id if current_lesson else '' }}"]`);
+  if (sideLink) {
+    const icon = sideLink.querySelector('.lesson-icon');
+    if (icon) { icon.textContent = '✓'; icon.className = 'lesson-icon flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] bg-green-100 text-green-600'; }
+  }
+  // Update progress bar
+  const bar = document.getElementById('progress-bar');
+  const label = document.getElementById('progress-label');
+  if (bar && label) {
+    const total = parseInt(bar.dataset.total);
+    const done  = parseInt(bar.dataset.done) + 1;
+    bar.dataset.done = done;
+    const pct = Math.round((done / total) * 100);
+    bar.style.width = pct + '%';
+    label.textContent = done + ' de ' + total + ' completadas';
+    document.getElementById('progress-pct').textContent = pct + '%';
+  }
+  if (auto) showToast('✅ Lección marcada como completada');
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-green-600 text-white text-sm font-medium px-5 py-3 rounded-full shadow-lg z-50 transition-opacity';
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 3000);
+}
+
+{% if current_lesson and current_lesson.id not in completed_ids %}
+let _elapsed = 0;
+const _timer = setInterval(() => {
+  _elapsed += 1;
+  const remaining = 180 - _elapsed;
+  const cd = document.getElementById('countdown');
+  if (cd) {
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    cd.textContent = m + ':' + String(s).padStart(2, '0');
+  }
+  if (_elapsed >= 180) {
+    clearInterval(_timer);
+    markDone({{ current_lesson.id }}, true);
+  }
+}, 1000);
+{% endif %}
+</script>
+
+<!-- Prose styles (all users) -->
+<style>
+.lesson-description h1,.lesson-description h2,.lesson-description h3{color:#18181b;font-weight:700;margin:.75em 0 .4em}
+.lesson-description h1{font-size:1.25rem}.lesson-description h2{font-size:1.1rem}.lesson-description h3{font-size:1rem}
+.lesson-description p{margin:0 0 .75em;color:#52525b;line-height:1.7}
+.lesson-description ul,.lesson-description ol{padding-left:1.5rem;margin:0 0 .75em;color:#52525b}
+.lesson-description li{margin:.2em 0}
+.lesson-description img{max-width:100%;border-radius:8px;margin:.5em 0}
+.lesson-description a{color:#7c3aed;text-decoration:underline}
+.lesson-description strong{color:#18181b;font-weight:600}
+.lesson-description blockquote{border-left:3px solid #e4e4e7;padding-left:1rem;color:#71717a;margin:.75em 0}
+.lesson-description table{border-collapse:collapse;width:100%;margin:.75em 0}
+.lesson-description th,.lesson-description td{border:1px solid #e4e4e7;padding:.4rem .6rem;font-size:.85rem}
+.lesson-description th{background:#fafafa;font-weight:600}
+</style>
+
+{% if current_user.is_admin and current_lesson %}
+<!-- Quill CSS -->
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet"/>
+<style>
+/* Quill inline editor */
+#quill-editor .ql-editor {
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:14px; color:#52525b; line-height:1.7; min-height:240px; padding:16px 20px;
+}
+#quill-editor .ql-editor h2{font-size:1.15rem;font-weight:700;color:#18181b;margin:.6em 0 .3em}
+#quill-editor .ql-editor h3{font-size:1rem;font-weight:700;color:#18181b;margin:.5em 0 .3em}
+#quill-editor .ql-editor p{margin:0 0 .6em}
+#quill-editor .ql-editor img{max-width:100%;border-radius:8px}
+#quill-editor .ql-editor a{color:#7c3aed}
+#quill-toolbar{padding:4px 8px}
+/* Edit button active state */
+#edit-btn.active{background:#ede9fe;color:#7c3aed;border-color:#a78bfa}
+</style>
+
+<!-- Quill JS -->
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script>
+let _quill = null;
+
+function startEdit() {
+  // Init Quill only once
+  if (!_quill) {
+    _quill = new Quill('#quill-editor', {
+      theme: 'snow',
+      modules: { toolbar: '#quill-toolbar' }
+    });
+    // Load current description into editor
+    const existing = {{ current_lesson.description | tojson }};
+    if (existing) _quill.root.innerHTML = existing;
+    // Custom image upload
+    _quill.getModule('toolbar').addHandler('image', function() {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'image/*'; inp.click();
+      inp.onchange = async () => {
+        const file = inp.files[0]; if (!file) return;
+        const fd = new FormData(); fd.append('file', file);
+        try {
+          const r = await fetch('{{ url_for("admin_upload_lesson_image", lesson_id=current_lesson.id) }}',
+                                {method:'POST', body:fd});
+          const data = await r.json();
+          if (data.location) {
+            const range = _quill.getSelection(true);
+            _quill.insertEmbed(range.index, 'image', data.location);
+            _quill.setSelection(range.index + 1);
+          }
+        } catch(e) { showToast('⚠️ Error subiendo imagen'); }
+      };
+    });
+  }
+  document.getElementById('desc-view').classList.add('hidden');
+  document.getElementById('desc-edit').classList.remove('hidden');
+  document.getElementById('edit-btn').classList.add('active');
+  _quill.focus();
+}
+
+function cancelEdit() {
+  document.getElementById('desc-edit').classList.add('hidden');
+  document.getElementById('desc-view').classList.remove('hidden');
+  document.getElementById('edit-btn').classList.remove('active');
+}
+
+async function saveEdit() {
+  const html = _quill.root.innerHTML;
+  // Optimistic update
+  const view = document.getElementById('desc-view');
+  if (html && html !== '<p><br></p>') {
+    view.innerHTML = html;
+    view.className = 'p-5 border-b border-[#f4f4f5] lesson-description';
+  } else {
+    view.innerHTML = '<p class="text-[#a1a1aa] text-sm italic">Sin descripción — haz clic en ✏️ para añadir contenido.</p>';
+    view.className = 'p-5 lesson-description';
+  }
+  cancelEdit();
+  showToast('💾 Guardando…');
+  // POST to server (no page reload)
+  try {
+    const fd = new FormData();
+    fd.append('description', html);
+    await fetch('{{ url_for("admin_save_lesson_description", lesson_id=current_lesson.id) }}',
+                {method:'POST', body:fd, redirect:'manual'});
+    showToast('✅ Contenido guardado');
+  } catch(e) { showToast('⚠️ Error al guardar'); }
+}
+
+function toggleFilesPanel() {
+  document.getElementById('files-panel').classList.toggle('hidden');
+}
+
+function toggleVideoEdit() {
+  document.getElementById('video-edit').classList.toggle('hidden');
+}
+
+async function saveVideo() {
+  const url = document.getElementById('video-url-input').value.trim();
+  try {
+    const fd = new FormData();
+    fd.append('video_url', url);
+    await fetch('{{ url_for("admin_save_lesson_video", lesson_id=current_lesson.id) }}',
+                {method:'POST', body:fd});
+    // Update iframe src without reloading
+    const wrap = document.getElementById('video-wrap');
+    if (url) {
+      // Convert to embed URL client-side (basic)
+      let embed = url;
+      if (url.includes('vimeo.com') && !url.includes('player.vimeo.com')) {
+        const parts = url.split('vimeo.com/')[1].split('?')[0].split('/');
+        embed = parts[1]
+          ? `https://player.vimeo.com/video/${parts[0]}?h=${parts[1]}`
+          : `https://player.vimeo.com/video/${parts[0]}`;
+      } else if (url.includes('youtu.be/')) {
+        const vid = url.split('youtu.be/')[1].split('?')[0];
+        embed = `https://www.youtube.com/embed/${vid}`;
+      } else if (url.includes('v=')) {
+        const vid = url.split('v=')[1].split('&')[0];
+        embed = `https://www.youtube.com/embed/${vid}`;
+      }
+      wrap.innerHTML = `<iframe src="${embed}" class="w-full h-full" allowfullscreen
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>`;
+    } else {
+      wrap.innerHTML = '<div class="w-full h-full flex items-center justify-center"><p class="text-[#71717a] text-sm">Sin vídeo</p></div>';
+    }
+    toggleVideoEdit();
+    showToast('✅ Vídeo actualizado');
+  } catch(e) { showToast('⚠️ Error al guardar el vídeo'); }
+}
+</script>
+{% endif %}
+
+{% endblock %}

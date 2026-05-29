@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% block title %}Editar — {{ course.title }}{% endblock %}
+{% block content_class %}max-w-4xl mx-auto{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <a href="{{ url_for('courses') }}" class="text-sm text-[#71717a] hover:text-[#18181b] inline-flex items-center gap-1">← Formaciones</a>
+  <form method="POST" action="{{ url_for('admin_delete_course', course_id=course.id) }}"
+        onsubmit="return confirm('¿Eliminar «{{ course.title }}» y todo su contenido? Esta acción no se puede deshacer.')">
+    <button type="submit"
+            class="text-xs font-medium text-red-500 hover:text-white hover:bg-red-500 border border-red-300 hover:border-red-500 px-3 py-1.5 rounded-lg transition">
+      🗑 Eliminar formación
+    </button>
+  </form>
+</div>
+<h1 class="text-xl font-bold text-[#18181b] mb-6">✏️ {{ course.title }}</h1>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+  <!-- Info del curso -->
+  <div class="bg-white border border-[#e4e4e7] rounded-xl p-5 shadow-sm">
+    <h2 class="text-sm font-bold text-[#18181b] mb-4">Información del curso</h2>
+    <form method="POST" enctype="multipart/form-data" class="space-y-4">
+      <input type="hidden" name="action" value="update"/>
+      <div>
+        <label class="block text-xs font-medium text-[#71717a] mb-1">Título</label>
+        <input type="text" name="title" class="input" value="{{ course.title }}" required/>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-[#71717a] mb-1">Subtítulo</label>
+        <input type="text" name="subtitle" class="input" value="{{ course.subtitle }}"/>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-[#71717a] mb-1">Descripción</label>
+        <textarea name="description" class="input" rows="4">{{ course.description }}</textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-[#71717a] mb-1">Foto de portada</label>
+        {% if course.cover_data %}
+        <div class="mb-2 rounded-lg overflow-hidden border border-[#e4e4e7]" style="max-height:140px">
+          <img src="{{ url_for('serve_course_cover', course_id=course.id) }}"
+               class="w-full h-full object-cover" alt="Portada actual"/>
+        </div>
+        <p class="text-[10px] text-[#a1a1aa] mb-1">Portada actual. Sube una nueva para reemplazarla.</p>
+        {% elif course.image %}
+        <div class="mb-2 rounded-lg overflow-hidden border border-[#e4e4e7]" style="max-height:140px">
+          <img src="{{ course.image }}" class="w-full h-full object-cover" alt="Portada actual"/>
+        </div>
+        <p class="text-[10px] text-[#a1a1aa] mb-1">Portada por URL. Sube un archivo para reemplazarla.</p>
+        {% endif %}
+        <label class="file-upload" style="position:relative">
+          <input type="file" name="cover_image" accept="image/*"/>
+          <span class="file-upload-btn">📎 Seleccionar imagen</span>
+          <span class="file-upload-name">Ningún archivo seleccionado</span>
+        </label>
+        <p class="text-[10px] text-[#a1a1aa] mt-1">JPG, PNG o WebP. Recomendado 800×600 px.</p>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-[#71717a] mb-1">Precio (€)</label>
+        <input type="number" name="price" class="input" value="{{ course.price }}" min="0" step="0.01"/>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" name="published" id="pub" class="accent-violet-600"
+               {% if course.is_published %}checked{% endif %}/>
+        <label for="pub" class="text-sm text-[#52525b]">Publicado</label>
+      </div>
+      <button type="submit" class="btn btn-primary w-full justify-center">Guardar cambios</button>
+    </form>
+  </div>
+
+  <!-- Secciones y lecciones -->
+  <div class="space-y-3">
+
+    <!-- Cabecera reorden -->
+    <div class="flex items-center justify-between text-xs font-medium" style="color:#7c3aed">
+      <span>⠿ Arrastra para reordenar carpetas</span>
+      <span id="sections-status" class="text-xs" style="color:#7c3aed"></span>
+    </div>
+
+    <div id="sections-list" class="space-y-4">
+    {% for section in course.sections %}
+    <div class="bg-white border border-[#e4e4e7] rounded-xl p-4 shadow-sm" data-id="{{ section.id }}">
+      <!-- Drag handle -->
+      <div class="flex items-center gap-2 mb-3">
+        <span class="drag-handle cursor-grab text-[#a1a1aa] hover:text-[#52525b] select-none text-lg leading-none">⠿</span>
+        <p class="text-sm font-bold text-[#18181b] flex-1">📁 {{ section.title }}</p>
+        <form method="POST" action="{{ url_for('admin_delete_section', section_id=section.id) }}"
+              onsubmit="return confirm('¿Eliminar sección y sus lecciones?')">
+          <button type="submit" class="text-xs text-[#a1a1aa] hover:text-red-500 transition">✕ Eliminar</button>
+        </form>
+      </div>
+
+      <div class="space-y-2 mb-3">
+        {% for lesson in section.lessons %}
+        <details class="bg-[#fafafa] border border-[#f0f0f0] rounded-lg overflow-hidden">
+          <summary class="flex items-center gap-2 py-1.5 px-3 cursor-pointer list-none hover:bg-[#f4f4f5] transition">
+            <span class="text-violet-400 text-xs">▶</span>
+            <span class="text-xs text-[#52525b] flex-1 truncate">{{ lesson.title }}</span>
+            {% if lesson.duration_min %}<span class="text-[10px] text-[#a1a1aa]">{{ lesson.duration_min }}m</span>{% endif %}
+            {% if lesson.files %}<span class="text-[10px] text-violet-500">📎 {{ lesson.files|length }}</span>{% endif %}
+            <form method="POST" action="{{ url_for('admin_delete_lesson', lesson_id=lesson.id) }}"
+                  onclick="event.stopPropagation()">
+              <button type="submit" class="text-[10px] text-[#a1a1aa] hover:text-red-500 ml-2">✕</button>
+            </form>
+          </summary>
+          <div class="px-3 pb-3 pt-2 border-t border-[#f0f0f0] space-y-2">
+            <!-- Sub-carpeta -->
+            <div class="flex items-center gap-2">
+              <label class="text-[10px] text-[#a1a1aa] font-semibold uppercase tracking-wide whitespace-nowrap">📂 Sub-carpeta</label>
+              <input type="text" class="input text-xs py-0.5 flex-1"
+                     value="{{ lesson.group_label or '' }}"
+                     placeholder="Nombre del grupo (vacío = sin grupo)"
+                     onchange="saveGroup({{ lesson.id }}, this.value)"
+                     onblur="saveGroup({{ lesson.id }}, this.value)"/>
+            </div>
+            <p class="text-[10px] text-[#a1a1aa] font-semibold uppercase tracking-wide">Archivos adjuntos</p>
+            {% for file in lesson.files %}
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] text-[#52525b] flex-1 truncate">📄 {{ file.name }}</span>
+              <form method="POST" action="{{ url_for('admin_delete_lesson_file', file_id=file.id) }}">
+                <button type="submit" class="text-[10px] text-[#a1a1aa] hover:text-red-500">✕</button>
+              </form>
+            </div>
+            {% endfor %}
+            <form method="POST" action="{{ url_for('admin_add_lesson_file', lesson_id=lesson.id) }}"
+                  enctype="multipart/form-data" class="flex flex-col gap-1.5 mt-2">
+              <input type="text" name="name" class="input text-xs py-1" placeholder="Nombre del archivo" required/>
+              <label class="file-upload" style="position:relative">
+                <input type="file" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.mp3" required/>
+                <span class="file-upload-btn">📎 Seleccionar</span>
+                <span class="file-upload-name">Ningún archivo seleccionado</span>
+              </label>
+              <button type="submit" class="btn btn-primary btn-sm self-start text-xs">+ Subir archivo</button>
+            </form>
+          </div>
+        </details>
+        {% endfor %}
+      </div>
+
+      <details class="text-xs">
+        <summary class="text-violet-600 cursor-pointer hover:text-violet-700 font-medium">+ Añadir lección</summary>
+        <form method="POST" action="{{ url_for('admin_add_lesson', section_id=section.id) }}" class="space-y-2 mt-3">
+          <input type="text" name="title"       class="input" placeholder="Título de la lección *" required/>
+          <input type="url"  name="video_url"   class="input" placeholder="URL YouTube (https://youtu.be/...)"/>
+          <textarea          name="description" class="input" rows="2" placeholder="Descripción (opcional)"></textarea>
+          <input type="number" name="duration"  class="input" placeholder="Duración en minutos" min="0"/>
+          <input type="text"   name="group_label" class="input" placeholder="Sub-carpeta (opcional, ej: Abril 2026)"/>
+          <button type="submit" class="btn btn-primary btn-sm">Añadir lección</button>
+        </form>
+      </details>
+    </div>
+    {% endfor %}
+    </div><!-- end #sections-list -->
+
+    <!-- Nueva sección -->
+    <div class="bg-white border border-[#e4e4e7] rounded-xl p-4 shadow-sm">
+      <h3 class="text-sm font-bold text-[#18181b] mb-3">📁 Nueva sección (carpeta)</h3>
+      <form method="POST" class="flex gap-2">
+        <input type="hidden" name="action" value="add_section"/>
+        <input type="text" name="section_title" class="input flex-1" placeholder="Nombre de la sección" required/>
+        <button type="submit" class="btn btn-primary flex-shrink-0">Añadir</button>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+async function saveGroup(lessonId, value) {
+  const fd = new FormData();
+  fd.append('group_label', value.trim());
+  await fetch(`/admin/leccion/${lessonId}/grupo`, {method:'POST', body:fd});
+}
+</script>
+<script>
+const sectionsList = document.getElementById('sections-list');
+const sectionsStatus = document.getElementById('sections-status');
+
+Sortable.create(sectionsList, {
+  handle: '.drag-handle',
+  animation: 150,
+  async onEnd() {
+    const ids = [...sectionsList.querySelectorAll('[data-id]')].map(el => parseInt(el.dataset.id));
+    sectionsStatus.textContent = 'Guardando…';
+    const res = await fetch('{{ url_for("admin_reorder_sections") }}', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({order: ids})
+    });
+    sectionsStatus.textContent = res.ok ? '✅ Guardado' : '❌ Error';
+    setTimeout(() => { sectionsStatus.textContent = ''; }, 2000);
+  }
+});
+</script>
+{% endblock %}

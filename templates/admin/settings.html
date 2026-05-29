@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Ajustes de comunidad{% endblock %}
+{% block content_class %}max-w-2xl mx-auto{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="{{ url_for('admin_dashboard') }}" class="text-sm" style="color:var(--text3)">← Admin</a>
+  <h1 class="text-xl font-bold" style="color:var(--text1)">⚙️ Ajustes de comunidad</h1>
+</div>
+
+<div class="rounded-xl p-6 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+  <form method="POST" enctype="multipart/form-data" class="space-y-5">
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Nombre de la academia</label>
+      <input type="text" name="academy_name" class="input" value="{{ s.academy_name }}"/>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Imagen de portada de la comunidad</label>
+      {% if s.community_image_data %}
+      <img src="{{ url_for('serve_banner') }}" class="mb-2 h-28 rounded-xl object-cover w-full"/>
+      {% endif %}
+      <label class="file-upload" style="position:relative">
+        <input type="file" name="community_image_file" accept="image/jpeg,image/png,image/webp,image/gif"/>
+        <span class="file-upload-btn">📎 Seleccionar imagen</span>
+        <span class="file-upload-name">Ningún archivo seleccionado</span>
+      </label>
+      <p class="text-[11px] mt-1" style="color:var(--text4)">JPG, PNG o WebP. Banner del panel de comunidad.</p>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Descripción de la comunidad</label>
+      <textarea name="community_description" class="input" rows="3"
+                placeholder="Describe brevemente tu comunidad...">{{ s.community_description }}</textarea>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">URL del enlace destacado</label>
+      <input type="url" name="link_url" class="input" value="{{ s.link_url }}" placeholder="https://..."/>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto del enlace</label>
+      <input type="text" name="link_text" class="input" value="{{ s.link_text }}" placeholder="¡Empieza por aquí!"/>
+    </div>
+
+    <hr style="border-color:var(--border)"/>
+    <h2 class="text-lg font-semibold" style="color:var(--text1)" id="emails">📧 Emails automáticos</h2>
+    <p class="text-xs mb-3" style="color:var(--text4)">Al registrarse (y tras confirmar el pago). HTML y variables entre llaves.</p>
+
+    <h3 class="text-sm font-semibold" style="color:var(--text1)">Bienvenida (usuario)</h3>
+    <p class="text-[11px] mb-2" style="color:var(--text4)">Variables: {% raw %}<code>{{username}}</code>, <code>{{email}}</code>, <code>{{plan_name}}</code>, <code>{{academy_name}}</code>, <code>{{login_url}}</code>, <code>{{approval_note}}</code>{% endraw %}</p>
+    <input type="text" name="welcome_email_subject" class="input mb-2"
+           value="{{ s.welcome_email_subject or default_welcome_subject }}" placeholder="Asunto"/>
+    <textarea name="welcome_email_body" class="input" rows="7">{{ s.welcome_email_body or default_welcome_body }}</textarea>
+
+    <h3 class="text-sm font-semibold mt-4" style="color:var(--text1)">Aviso a administradores</h3>
+    <p class="text-[11px] mb-2" style="color:var(--text4)">Variables: {% raw %}<code>{{username}}</code>, <code>{{email}}</code>, <code>{{bio}}</code>, <code>{{plan_name}}</code>, <code>{{plan_price}}</code>, <code>{{created_at}}</code>, <code>{{status}}</code>{% endraw %}</p>
+    <input type="text" name="admin_reg_email_subject" class="input mb-2"
+           value="{{ s.admin_reg_email_subject or default_admin_subject }}"/>
+    <textarea name="admin_reg_email_body" class="input" rows="7">{{ s.admin_reg_email_body or default_admin_body }}</textarea>
+    <p class="text-[11px] mt-1" style="color:var(--text4)">Requiere SMTP configurado (MAIL_* en Docker).</p>
+
+    <button type="submit" class="btn btn-primary w-full justify-center">Guardar ajustes</button>
+  </form>
+</div>
+{% endblock %}

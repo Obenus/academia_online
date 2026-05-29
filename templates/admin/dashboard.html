@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Panel Admin{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-bold text-[#18181b] mb-6">⚙️ Panel de administración</h1>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  {% for label, val, icon, color in [
+    ('Alumnos',       stats.users,       '👥', 'violet'),
+    ('Cursos',        stats.courses,     '📚', 'blue'),
+    ('Posts',         stats.posts,       '💬', 'green'),
+    ('Inscripciones', stats.enrollments, '🎓', 'orange'),
+  ] %}
+  <div class="bg-white border border-[#e4e4e7] rounded-xl p-5 shadow-sm">
+    <p class="text-2xl mb-2">{{ icon }}</p>
+    <p class="text-2xl font-bold text-[#18181b]">{{ val }}</p>
+    <p class="text-xs text-[#71717a] mt-0.5">{{ label }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+  <div class="bg-white border border-[#e4e4e7] rounded-xl p-5 shadow-sm">
+    <h2 class="text-sm font-bold text-[#18181b] mb-4">🚀 Acciones rápidas</h2>
+    <div class="space-y-2">
+      <a href="{{ url_for('admin_new_course') }}"     class="btn btn-primary w-full justify-center">➕ Nuevo curso</a>
+      <a href="{{ url_for('admin_new_live_class') }}" class="btn btn-secondary w-full justify-center">📅 Nueva clase en directo</a>
+      <a href="{{ url_for('new_post') }}"             class="btn btn-secondary w-full justify-center">✏️ Publicar en comunidad</a>
+      <a href="{{ url_for('admin_email') }}"          class="btn btn-secondary w-full justify-center">📧 Enviar email a alumnos</a>
+      <a href="{{ url_for('admin_settings') }}"       class="btn btn-secondary w-full justify-center">⚙️ Ajustes comunidad</a>
+      <a href="{{ url_for('admin_backups') }}"        class="btn btn-secondary w-full justify-center">💾 Backups</a>
+      <a href="{{ url_for('admin_plans') }}"          class="btn btn-secondary w-full justify-center">📋 Planes y precios</a>
+      <a href="{{ url_for('admin_payments') }}"       class="btn btn-secondary w-full justify-center">💳 Pagos Stripe</a>
+      <a href="{{ url_for('admin_subscriptions') }}"  class="btn btn-secondary w-full justify-center">📊 Suscripciones</a>
+    </div>
+  </div>
+
+  <div class="bg-white border border-[#e4e4e7] rounded-xl p-5 shadow-sm">
+    <h2 class="text-sm font-bold text-[#18181b] mb-4">🏷 Categorías de comunidad</h2>
+    <div class="space-y-2 mb-4 max-h-40 overflow-y-auto">
+      {% for cat in categories %}
+      <div class="flex items-center justify-between">
+        <span class="text-sm px-3 py-1 rounded-full font-medium"
+              style="background:{{ cat.color }}18; color:{{ cat.color }}">
+          {{ cat.emoji }} {{ cat.name }}
+        </span>
+        <form method="POST" action="{{ url_for('admin_delete_category', cat_id=cat.id) }}"
+              onsubmit="return confirm('¿Eliminar?')">
+          <button type="submit" class="text-xs text-[#a1a1aa] hover:text-red-500 transition">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    <form method="POST" action="{{ url_for('admin_new_category') }}" class="space-y-2">
+      <div class="flex gap-2">
+        <input type="text"  name="emoji" class="input w-14 text-center" placeholder="💬" maxlength="2"/>
+        <input type="text"  name="name"  class="input flex-1" placeholder="Nombre" required/>
+        <input type="color" name="color" value="#7c3aed"
+               class="h-10 w-10 rounded-lg border border-[#d4d4d8] cursor-pointer flex-shrink-0 bg-white"/>
+      </div>
+      <button type="submit" class="btn btn-secondary btn-sm">Añadir categoría</button>
+    </form>
+  </div>
+</div>
+
+<!-- Importar desde Skool -->
+<div class="mt-6 bg-violet-50 border border-violet-200 rounded-xl p-5">
+  <h2 class="text-sm font-bold text-violet-800 mb-2">📥 Importar desde Skool</h2>
+  <a href="{{ url_for('admin_importar_descripciones') }}"
+     onclick="return confirm('¿Importar descripciones y vídeos desde Skool? Solo actualiza lecciones vacías.')"
+     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition">
+    📋 Importar descripciones y vídeos de Skool
+  </a>
+  <p class="text-xs text-violet-600 mt-2">Solo rellena las lecciones que están vacías, no sobreescribe lo que ya tienes.</p>
+</div>
+{% endblock %}

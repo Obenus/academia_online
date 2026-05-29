@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block title %}Actividad — {{ member.username }}{% endblock %}
+{% block content_class %}max-w-2xl mx-auto{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="flex items-center gap-3 mb-6">
+  <a href="{{ url_for('members') }}"
+     class="w-8 h-8 rounded-full flex items-center justify-center transition"
+     style="background:var(--hover-bg);color:var(--text3)">←</a>
+
+  {% if member.avatar_data %}
+  <img src="{{ url_for('serve_avatar', user_id=member.id) }}"
+       class="w-12 h-12 rounded-full object-cover flex-shrink-0"/>
+  {% else %}
+  <div class="w-12 h-12 rounded-full bg-violet-600 flex items-center justify-center
+              text-white text-lg font-bold flex-shrink-0">{{ member.initials }}</div>
+  {% endif %}
+
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-2 flex-wrap mb-0.5">
+      <h1 class="text-lg font-bold leading-tight" style="color:var(--text1)">{{ member.username }}</h1>
+      {% if member.is_admin %}<span class="text-xs font-normal text-violet-500">Admin</span>{% endif %}
+      <!-- Nivel badge -->
+      <span class="text-xs font-bold px-2.5 py-0.5 rounded-full text-white"
+            style="background:{{ user_level.color }}">
+        {{ user_level.emoji }} Niv. {{ user_level.num }} · {{ user_level.name }}
+      </span>
+    </div>
+    <p class="text-xs mb-2" style="color:var(--text4)">
+      Miembro desde {{ member.created_at.strftime('%d/%m/%Y') }}
+      {% if member.last_seen %} · Última conexión {{ member.last_seen.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+    </p>
+    <!-- Barra de progreso del nivel -->
+    {% if not user_level.is_max %}
+    <div class="flex items-center gap-2">
+      <div class="flex-1 h-1.5 rounded-full overflow-hidden" style="background:var(--hover-bg)">
+        <div class="h-full rounded-full" style="width:{{ user_level.progress }}%;background:{{ user_level.color }}"></div>
+      </div>
+      <span class="text-[10px]" style="color:var(--text4)">{{ user_level.pts_to_next }} pts → Niv. {{ user_level.num + 1 }}</span>
+    </div>
+    {% else %}
+    <p class="text-[10px] font-bold" style="color:{{ user_level.color }}">🎉 Nivel máximo</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Estadísticas rápidas -->
+<div class="grid grid-cols-4 gap-3 mb-6">
+  {% for icon, label, value, color in [
+      ('📚', 'Lecciones', stats.lessons, '#7c3aed'),
+      ('📝', 'Posts', stats.posts, '#2563eb'),
+      ('💬', 'Comentarios', stats.comments, '#059669'),
+      ('⭐', 'Puntos', stats.points, '#d97706'),
+  ] %}
+  <div class="rounded-xl p-3 text-center border" style="background:var(--surface);border-color:var(--border)">
+    <p class="text-xl mb-0.5">{{ icon }}</p>
+    <p class="text-lg font-bold" style="color:{{ color }}">{{ value }}</p>
+    <p class="text-[10px]" style="color:var(--text4)">{{ label }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Timeline -->
+<div class="rounded-xl border overflow-hidden" style="background:var(--surface);border-color:var(--border)">
+  <div class="px-5 py-3 border-b flex items-center justify-between" style="border-color:var(--border)">
+    <h2 class="text-sm font-bold" style="color:var(--text1)">⚡ Actividad reciente</h2>
+    <span class="text-xs" style="color:var(--text4)">{{ timeline|length }} acciones</span>
+  </div>
+
+  {% if timeline %}
+  <div class="divide-y" style="--tw-divide-opacity:1">
+    {% for item in timeline %}
+    <div class="flex items-start gap-3 px-5 py-3 hover:opacity-90 transition"
+         style="border-color:var(--border)">
+
+      <!-- Icono -->
+      <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-base mt-0.5"
+           style="background:var(--hover-bg)">
+        {{ item.icon }}
+      </div>
+
+      <!-- Texto -->
+      <div class="flex-1 min-w-0">
+        <p class="text-sm" style="color:var(--text1)">{{ item.text | safe }}</p>
+        {% if item.sub %}
+        <p class="text-xs mt-0.5 truncate" style="color:var(--text4)">{{ item.sub }}</p>
+        {% endif %}
+        <p class="text-[10px] mt-1" style="color:var(--text4)">
+          {{ item.date.strftime('%d/%m/%Y · %H:%M') }}
+        </p>
+      </div>
+
+      <!-- Puntos -->
+      <div class="text-xs font-bold text-violet-500 flex-shrink-0 mt-1">
+        +{{ item.pts }} pts
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="text-center py-16" style="color:var(--text3)">
+    <p class="text-4xl mb-3">💤</p>
+    <p class="font-medium">Sin actividad todavía.</p>
+    <p class="text-sm mt-1">Cuando complete lecciones, publique posts o comente aparecerá aquí.</p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

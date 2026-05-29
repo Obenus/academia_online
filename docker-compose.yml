@@ -1,0 +1,79 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: miacademia-app
+    ports:
+      - "8080:5000"
+    environment:
+      PORT: 5000
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/miacademia}
+      ACADEMY_NAME: ${ACADEMY_NAME:-Marca Atractora}
+      STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:-}
+      MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USE_TLS: ${MAIL_USE_TLS:-true}
+      MAIL_USE_SSL: ${MAIL_USE_SSL:-false}
+      SECRET_KEY_FILE: /run/secrets/secret_key
+      MAIL_USERNAME_FILE: /run/secrets/mail_username
+      MAIL_PASSWORD_FILE: /run/secrets/mail_password
+      STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
+    volumes:
+      - ./secrets:/run/secrets:ro
+      - ./backups:/app/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  billing:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: miacademia-billing
+    command: ["python", "billing_worker.py"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/miacademia}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: miacademia-backup
+    command: ["python", "backup_worker.py"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/miacademia}
+      SECRET_KEY_FILE: /run/secrets/secret_key
+    volumes:
+      - ./secrets:/run/secrets:ro
+      - ./backups:/app/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: miacademia-db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: miacademia
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d miacademia"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
