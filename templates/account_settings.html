@@ -29,7 +29,7 @@
   <!-- Foto de perfil -->
   <div class="rounded-xl p-6 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
     <h2 class="text-sm font-bold mb-4" style="color:var(--text1)">🖼️ Foto de perfil</h2>
-    <div class="flex items-center gap-5">
+    <div class="flex flex-col sm:flex-row items-center sm:items-start gap-5">
       <div class="w-20 h-20 rounded-full overflow-hidden bg-violet-600 flex items-center justify-center flex-shrink-0">
         {% if current_user.avatar_data %}
         <img src="{{ url_for('serve_avatar', user_id=current_user.id) }}" class="w-full h-full object-cover"/>
@@ -40,13 +40,13 @@
       <form method="POST" enctype="multipart/form-data" class="flex-1">
         <input type="hidden" name="action" value="avatar"/>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--text2)">Subir nueva foto (JPG, PNG — máx. 4 MB)</label>
-        <div class="flex gap-2 items-center">
-          <label class="file-upload flex-1" style="position:relative">
+        <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full">
+          <label class="file-upload flex-1 w-full" style="position:relative">
             <input type="file" name="avatar" accept="image/*" required/>
             <span class="file-upload-btn">📎 Seleccionar</span>
             <span class="file-upload-name">Ningún archivo seleccionado</span>
           </label>
-          <button type="submit" class="btn btn-primary flex-shrink-0">Subir</button>
+          <button type="submit" class="btn btn-primary flex-shrink-0 w-full sm:w-auto justify-center">Subir</button>
         </div>
       </form>
     </div>

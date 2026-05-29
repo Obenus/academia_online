@@ -26,13 +26,13 @@
 {% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3 page-head">
   <div>
     <h1 class="text-xl font-bold text-[#18181b]">📅 Calendario</h1>
     <p class="text-sm text-[#71717a] mt-0.5">Eventos, encuentros y actividades programadas</p>
   </div>
   {% if current_user.is_admin %}
-  <div class="flex gap-2 flex-wrap">
+  <div class="flex gap-2 flex-wrap page-head-actions">
     <a href="{{ url_for('admin_live_classes') }}" class="btn btn-secondary btn-sm">⚙️ Categorías y eventos</a>
     <a href="{{ url_for('admin_new_live_class') }}" class="btn btn-primary btn-sm">➕ Nuevo evento</a>
   </div>
@@ -51,8 +51,10 @@
 {% endif %}
 
 <div class="grid grid-cols-1 lg:grid-cols-4 gap-5">
-  <div class="lg:col-span-3 bg-white border border-[#e4e4e7] rounded-xl p-5 shadow-sm">
-    <div id="calendar" style="min-height:600px"></div>
+  <div class="lg:col-span-3 bg-white border border-[#e4e4e7] rounded-xl p-3 sm:p-5 shadow-sm overflow-hidden">
+    <div id="calendar-wrap">
+    <div id="calendar" style="min-height:520px"></div>
+    </div>
     <p id="calendar-error" class="hidden text-sm text-red-600 mt-3">
       No se pudo cargar el calendario. Recarga la página o contacta con el administrador.
     </p>
@@ -94,8 +96,8 @@
   </div>
 </div>
 
-<div id="modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden" onclick="closeModal(event)">
-  <div class="rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl" onclick="event.stopPropagation()"
+<div id="modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden modal-sheet p-4" onclick="closeModal(event)">
+  <div class="modal-panel rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl" onclick="event.stopPropagation()"
        style="background:var(--surface);border:1px solid var(--border)">
     <p id="modal-category" class="text-xs font-bold uppercase mb-1 hidden"></p>
     <h2 id="modal-title" class="text-lg font-bold mb-1" style="color:var(--text1)"></h2>
@@ -121,10 +123,14 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
   try {
+    const narrow = window.matchMedia('(max-width: 767px)').matches;
     const cal = new FullCalendar.Calendar(el, {
-      initialView: 'dayGridMonth',
+      initialView: narrow ? 'listWeek' : 'dayGridMonth',
       locale: 'es',
-      headerToolbar: { left:'prev,next today', center:'title', right:'dayGridMonth,timeGridWeek' },
+      headerToolbar: narrow
+        ? { left: 'prev,next', center: 'title', right: 'today' }
+        : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' },
+      buttonText: { today: 'Hoy', month: 'Mes', week: 'Semana', list: 'Lista' },
       events: '/calendario/data',
       eventDisplay: 'block',
       eventClick(info) {

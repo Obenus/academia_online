@@ -3,17 +3,34 @@
 {% block content_class %}max-w-7xl mx-auto{% endblock %}
 
 {% block content %}
-<div class="flex gap-0 -mx-2 min-h-[80vh]">
+<button type="button" id="learn-syllabus-open"
+        class="lg:hidden fixed z-40 flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg text-sm font-semibold text-white bg-violet-600 hover:bg-violet-700"
+        style="bottom:calc(4.5rem + env(safe-area-inset-bottom, 0px)); right:1rem"
+        onclick="toggleLearnSidebar(true)" aria-label="Abrir índice del curso">
+  📋 Índice
+</button>
+
+<div id="learn-sidebar-backdrop" class="hidden lg:hidden fixed inset-0 z-[54] bg-black/50"
+     onclick="toggleLearnSidebar(false)" aria-hidden="true"></div>
+
+<div class="flex flex-col lg:flex-row gap-4 lg:gap-5 min-h-[60vh] w-full max-w-full">
 
   <!-- ── Left panel: accordion sidebar ── -->
-  <div class="w-80 flex-shrink-0 bg-white border border-[#e4e4e7] rounded-xl mr-5 flex flex-col shadow-sm overflow-hidden">
+  <div id="learn-sidebar-panel"
+       class="fixed lg:static inset-y-0 left-0 z-[55] w-80 max-w-[92vw] lg:w-80 flex-shrink-0
+              bg-white border border-[#e4e4e7] rounded-none lg:rounded-xl
+              flex flex-col shadow-xl lg:shadow-sm overflow-hidden">
 
     <!-- Header -->
     <div class="p-4 border-b border-[#e4e4e7]">
-      <a href="{{ url_for('courses') }}"
-         class="text-xs text-[#71717a] hover:text-[#18181b] inline-flex items-center gap-1 mb-2">
-        ← Volver a formaciones
-      </a>
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <a href="{{ url_for('courses') }}"
+           class="text-xs text-[#71717a] hover:text-[#18181b] inline-flex items-center gap-1">
+          ← Volver
+        </a>
+        <button type="button" class="lg:hidden text-xs font-medium text-violet-600 px-2 py-1"
+                onclick="toggleLearnSidebar(false)">✕ Cerrar</button>
+      </div>
       <h2 class="text-sm font-bold text-[#18181b] truncate">{{ course.title }}</h2>
 
       {% set total = course.lesson_count %}
@@ -131,7 +148,7 @@
   </div>
 
   <!-- ── Right panel: video + info ── -->
-  <div class="flex-1 min-w-0">
+  <div class="flex-1 min-w-0 w-full max-w-full">
     {% if current_lesson %}
 
     <!-- Video player -->
@@ -160,7 +177,7 @@
       <!-- Video URL edit panel -->
       <div id="video-edit" class="hidden mt-2 bg-white border border-[#e4e4e7] rounded-xl p-4 shadow-sm">
         <p class="text-xs text-[#71717a] mb-2">Pega la URL de Vimeo, YouTube u otro servicio compatible.</p>
-        <div class="flex gap-2">
+        <div class="flex flex-col sm:flex-row gap-2">
           <input id="video-url-input" type="url"
                  value="{{ current_lesson.video_url }}"
                  placeholder="https://vimeo.com/… o https://youtu.be/…"
@@ -177,8 +194,8 @@
     <div class="bg-white border border-[#e4e4e7] rounded-xl shadow-sm overflow-hidden">
 
       <!-- Title bar -->
-      <div class="flex items-start justify-between gap-4 p-5 border-b border-[#f4f4f5]">
-        <div class="min-w-0">
+      <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 p-4 sm:p-5 border-b border-[#f4f4f5]">
+        <div class="min-w-0 flex-1">
           <p class="text-[11px] text-[#a1a1aa] mb-0.5 uppercase tracking-wide">
             {% for section in course.sections %}
               {% if section.id == current_lesson.section_id %}{{ section.title }}{% endif %}
@@ -189,7 +206,7 @@
           <p class="text-xs text-[#a1a1aa] mt-0.5">⏱ {{ current_lesson.duration_min }} minutos</p>
           {% endif %}
         </div>
-        <div class="flex items-center gap-2 flex-shrink-0">
+        <div class="flex flex-wrap items-center gap-2 flex-shrink-0 w-full sm:w-auto">
           {% if current_user.is_admin %}
           <!-- Edit content button -->
           <button id="edit-btn" onclick="startEdit()" title="Editar contenido"
@@ -361,6 +378,27 @@
 </div>
 
 <script>
+function toggleLearnSidebar(open) {
+  const panel = document.getElementById('learn-sidebar-panel');
+  const backdrop = document.getElementById('learn-sidebar-backdrop');
+  if (!panel || window.matchMedia('(min-width: 1024px)').matches) return;
+  const show = open === undefined ? !panel.classList.contains('is-open') : open;
+  if (show) {
+    panel.classList.add('is-open');
+    if (backdrop) { backdrop.classList.remove('hidden'); backdrop.classList.add('is-open'); }
+    document.body.style.overflow = 'hidden';
+  } else {
+    panel.classList.remove('is-open');
+    if (backdrop) { backdrop.classList.add('hidden'); backdrop.classList.remove('is-open'); }
+    document.body.style.overflow = '';
+  }
+}
+document.querySelectorAll('#learn-sidebar-panel a[href]').forEach(function(a) {
+  a.addEventListener('click', function() {
+    if (window.matchMedia('(max-width: 1023px)').matches) toggleLearnSidebar(false);
+  });
+});
+
 async function markDone(lessonId, auto) {
   await fetch(`/cursos/{{ course.id }}/completar/${lessonId}`, {method:'POST'});
   const status = document.getElementById('done-status');
@@ -391,7 +429,8 @@ async function markDone(lessonId, auto) {
 function showToast(msg) {
   const t = document.createElement('div');
   t.textContent = msg;
-  t.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-green-600 text-white text-sm font-medium px-5 py-3 rounded-full shadow-lg z-50 transition-opacity';
+  t.className = 'fixed left-1/2 -translate-x-1/2 bg-green-600 text-white text-sm font-medium px-5 py-3 rounded-full shadow-lg z-[80] transition-opacity';
+  t.style.bottom = 'calc(5rem + env(safe-area-inset-bottom, 0px))';
   document.body.appendChild(t);
   setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 3000);
 }

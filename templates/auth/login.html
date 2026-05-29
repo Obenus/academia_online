@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Iniciar sesión</title>
+<title>Iniciar sesión · {{ academy_name }}</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body{background:#f4f4f5;color:#18181b;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;}
@@ -14,7 +14,7 @@
 <div class="w-full max-w-md">
   <div class="text-center mb-8">
     <div class="w-16 h-16 bg-violet-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">🎓</div>
-    <h1 class="text-2xl font-bold text-[#18181b]">Marca Atractora</h1>
+    <h1 class="text-2xl font-bold text-[#18181b]">{{ academy_name }}</h1>
     <p class="text-[#71717a] text-sm mt-1">Inicia sesión para continuar</p>
   </div>
 
@@ -32,6 +32,7 @@
 
   <div class="bg-white border border-[#e4e4e7] rounded-2xl p-8 shadow-sm">
     <form method="POST" class="space-y-4">
+      {% include 'includes/csrf_field.html' %}
       <div>
         <label class="block text-sm font-medium text-[#52525b] mb-1.5">Email</label>
         <input type="email" name="email" class="input" placeholder="tu@email.com" required autofocus/>

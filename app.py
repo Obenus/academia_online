@@ -194,6 +194,19 @@ def get_leaderboard(since=None):
              .all())
     return [(user, total or 0) for user, total in rows]
 
+def display_academy_name(site=None):
+    """Nombre visible de la academia (BD, .env o valor por defecto)."""
+    if site is None:
+        try:
+            site = get_settings()
+        except Exception:
+            site = None
+    n = ((site.academy_name if site else None) or '').strip()
+    if n:
+        return n
+    return (app.config.get('ACADEMY_NAME') or '').strip() or 'Academia'
+
+
 def get_settings():
     s = SiteSettings.query.first()
     env_name = (app.config.get('ACADEMY_NAME') or '').strip()
@@ -201,31 +214,29 @@ def get_settings():
         s = SiteSettings(academy_name=env_name or 'Marca Atractora')
         db.session.add(s)
         db.session.commit()
-    elif env_name and (not s.academy_name or s.academy_name.strip() == 'Marca Atractora'):
-        # Si sigue en valor por defecto, sincronizar con ACADEMY_NAME del entorno.
+    elif env_name and (not s.academy_name or s.academy_name.strip() in ('', 'Marca Atractora')):
+        s.academy_name = env_name
+        db.session.commit()
+    elif not (s.academy_name or '').strip() and env_name:
         s.academy_name = env_name
         db.session.commit()
     return s
 
 @app.context_processor
 def inject_settings():
+    from flask_wtf.csrf import generate_csrf
     try:
-        from flask_wtf.csrf import generate_csrf
-        return {
-            'site': get_settings(),
-            'csrf_token': generate_csrf,
-            'spanish_provinces': SPANISH_PROVINCES,
-            'city_other_value': CITY_OTHER_VALUE,
-            'city_other_label': CITY_OTHER_LABEL,
-        }
+        site = get_settings()
     except Exception:
-        return {
-            'site': SiteSettings(),
-            'csrf_token': lambda: '',
-            'spanish_provinces': SPANISH_PROVINCES,
-            'city_other_value': CITY_OTHER_VALUE,
-            'city_other_label': CITY_OTHER_LABEL,
-        }
+        site = None
+    return {
+        'site': site or SiteSettings(),
+        'academy_name': display_academy_name(site),
+        'csrf_token': generate_csrf,
+        'spanish_provinces': SPANISH_PROVINCES,
+        'city_other_value': CITY_OTHER_VALUE,
+        'city_other_label': CITY_OTHER_LABEL,
+    }
 
 app.register_blueprint(features_bp)
 register_bulk_email_routes(app, mail, get_settings)
@@ -435,7 +446,7 @@ def register():
         errors=errors, form=form, plans=plans, pay_on=pay_on,
         city_state=city_state,
         stripe_pk=get_stripe_public(app),
-        academy_name=site.academy_name if site else app.config.get('ACADEMY_NAME', 'Academia'),
+        academy_name=display_academy_name(site),
     )
 
 
@@ -758,6 +769,12 @@ def like_comment(comment_id):
     return jsonify({'likes': len(comment.likes), 'liked': liked})
 
 # ── COURSES ───────────────────────────────────────────────────────────────────
+
+@app.route('/formaciones')
+@login_required
+def formaciones_redirect():
+    return redirect(url_for('courses'))
+
 
 @app.route('/cursos')
 @login_required

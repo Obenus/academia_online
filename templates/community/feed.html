@@ -12,7 +12,7 @@
     {% if live_now %}
     <div class="live-banner rounded-xl mb-4 overflow-hidden" style="background:linear-gradient(90deg,#dc2626,#b91c1c)">
       <a href="{{ live_now.meet_url or '#' }}" target="_blank"
-         class="flex items-center gap-3 px-4 py-3.5 transition hover:opacity-90"
+         class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 px-4 py-3.5 transition hover:opacity-90"
          style="color:#fff;text-decoration:none">
         <!-- Indicador pulsante -->
         <span class="flex items-center gap-2 font-bold text-sm flex-shrink-0">
@@ -39,14 +39,14 @@
     </style>
 
     {% elif next_class %}
-    <div class="flex items-center gap-3 px-4 py-3.5 rounded-xl mb-4"
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 px-4 py-3.5 rounded-xl mb-4"
          style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff">
       <span class="text-base flex-shrink-0">📅</span>
       <div class="flex-1 min-w-0">
         <p class="text-sm font-semibold truncate">{{ next_class.title }}</p>
         <p class="text-xs opacity-75 mt-0.5">{{ next_class.scheduled_at.strftime('%d %b · %H:%M') }}</p>
       </div>
-      <div class="flex items-center gap-2 flex-shrink-0">
+      <div class="flex flex-wrap items-center gap-2 flex-shrink-0 w-full sm:w-auto">
         {% if next_class.meet_url %}
         <a href="{{ next_class.meet_url }}" target="_blank"
            class="text-xs font-bold bg-white text-violet-700 px-3 py-1.5 rounded-lg shadow hover:bg-violet-50 transition"
@@ -63,9 +63,9 @@
     </div>
     {% endif %}
 
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
       <h1 class="text-lg font-bold" style="color:var(--text1)">Comunidad</h1>
-      <button onclick="openPostModal()" class="btn btn-primary">✏️ Publicar</button>
+      <button onclick="openPostModal()" class="btn btn-primary w-full sm:w-auto justify-center">✏️ Publicar</button>
     </div>
 
     <!-- Filtros por categoría -->
@@ -478,9 +478,9 @@ function escHtml(str) {
 </script>
 
 <!-- Modal nuevo post / editar post -->
-<div id="post-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden"
+<div id="post-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden modal-sheet"
      style="background:rgba(0,0,0,0.5)" onclick="closePostModal(event)">
-  <div class="w-full max-w-xl mx-4 rounded-2xl shadow-2xl overflow-hidden"
+  <div class="modal-panel w-full max-w-xl mx-4 rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
        style="background:var(--surface);border:1px solid var(--border)"
        onclick="event.stopPropagation()">
 
@@ -493,7 +493,7 @@ function escHtml(str) {
     </div>
 
     <!-- Form new post -->
-    <form id="post-form-new" method="POST" action="{{ url_for('new_post') }}" class="p-5 space-y-4">
+    <form id="post-form-new" method="POST" action="{{ url_for('new_post') }}" class="p-5 space-y-4 overflow-y-auto flex-1">
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--text3)">Categoría</label>
         <select name="category_id" class="input">

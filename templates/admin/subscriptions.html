@@ -3,7 +3,7 @@
 {% block content_class %}max-w-6xl mx-auto{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3 page-head">
   <div class="flex items-center gap-3">
     <a href="{{ url_for('admin_payments') }}" class="text-sm" style="color:var(--text3)">← Pagos</a>
     <h1 class="text-xl font-bold" style="color:var(--text1)">📊 Suscripciones y pagos</h1>
@@ -11,8 +11,8 @@
   <a href="{{ url_for('admin_users') }}" class="btn btn-secondary btn-sm">Gestionar usuarios</a>
 </div>
 
-<div class="rounded-xl overflow-hidden shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
-  <div class="overflow-x-auto">
+<div class="rounded-xl overflow-hidden shadow-sm table-scroll" style="background:var(--surface);border:1px solid var(--border)">
+  <div>
     <table class="w-full text-sm">
       <thead>
         <tr style="border-bottom:1px solid var(--border);background:var(--hover-bg)">

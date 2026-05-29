@@ -19,7 +19,7 @@
   </div>
   <div class="divide-y" style="--tw-divide-color:var(--border)">
     {% for u in pending %}
-    <div class="flex items-center gap-3 px-5 py-3">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-5 py-3">
       <!-- Avatar -->
       <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
            style="background:#a1a1aa">
@@ -37,8 +37,8 @@
         <p class="text-[10px]" style="color:var(--text4)">Solicitó acceso {{ u.created_at.strftime('%d/%m/%Y · %H:%M') }}</p>
       </div>
       <!-- Acciones -->
-      <div class="flex items-center gap-2 flex-shrink-0">
-        <form method="POST" action="{{ url_for('members_approve', user_id=u.id) }}">
+      <div class="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto">
+        <form method="POST" action="{{ url_for('members_approve', user_id=u.id) }}" class="flex-1 sm:flex-none">
           <button type="submit"
                   class="px-3 py-1.5 rounded-lg text-xs font-bold text-white transition"
                   style="background:#059669">

@@ -3,7 +3,7 @@
 {% block content_class %}max-w-4xl mx-auto{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-6">
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3 page-head">
   <h1 class="text-xl font-bold text-[#18181b]">📝 Gestionar formaciones</h1>
   <div class="flex items-center gap-2">
     <form method="POST" action="{{ url_for('admin_purge_duplicate_fase5') }}"

@@ -3,10 +3,10 @@
 {% block content_class %}max-w-6xl mx-auto{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-6">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 page-head">
   <h1 class="text-xl font-bold" style="color:var(--text1)">📚 Formaciones</h1>
   {% if current_user.is_admin %}
-  <a href="{{ url_for('admin_new_course') }}" class="btn btn-primary">➕ Nuevo curso</a>
+  <a href="{{ url_for('admin_new_course') }}" class="btn btn-primary w-full sm:w-auto justify-center">➕ Nuevo curso</a>
   {% endif %}
 </div>
 

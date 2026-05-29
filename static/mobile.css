@@ -1,0 +1,154 @@
+/* Responsive global — Academia Online */
+
+html {
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: clip;
+  max-width: 100vw;
+}
+
+/* Espacio para barra inferior fija (móvil) */
+@media (max-width: 767px) {
+  main.main-with-bottom-nav {
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .btn,
+  .tab-link,
+  header button,
+  nav.md\:hidden a {
+    min-height: 44px;
+  }
+
+  nav.md\:hidden a {
+    min-height: auto;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}
+
+/* Tablas admin: scroll horizontal suave */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+.table-scroll table {
+  min-width: 640px;
+}
+
+/* Modales a pantalla casi completa en móvil */
+@media (max-width: 639px) {
+  .modal-sheet {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .modal-sheet > .modal-panel {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    border-radius: 1rem 1rem 0 0 !important;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+}
+
+/* Contenido rico (lecciones, posts) */
+.lesson-description img,
+.lesson-description video,
+.lesson-description iframe,
+.prose-safe img {
+  max-width: 100%;
+  height: auto;
+}
+
+.lesson-description table {
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Drawer índice del curso */
+#learn-sidebar-backdrop {
+  transition: opacity 0.2s;
+}
+
+#learn-sidebar-panel {
+  transition: transform 0.25s ease;
+}
+
+@media (max-width: 1023px) {
+  #learn-sidebar-backdrop.is-open {
+    display: block !important;
+  }
+
+  #learn-sidebar-panel {
+    transform: translateX(-100%);
+  }
+
+  #learn-sidebar-panel.is-open {
+    transform: translateX(0);
+  }
+}
+
+@media (min-width: 1024px) {
+  #learn-sidebar-backdrop {
+    display: none !important;
+  }
+
+  #learn-sidebar-panel {
+    transform: none !important;
+    position: static !important;
+  }
+
+  #learn-syllabus-open {
+    display: none !important;
+  }
+}
+
+/* FullCalendar en móvil */
+@media (max-width: 767px) {
+  .fc .fc-toolbar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .fc .fc-toolbar-chunk {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 0.95rem !important;
+  }
+
+  .fc .fc-button {
+    padding: 0.35rem 0.5rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  #calendar-wrap {
+    min-height: 380px !important;
+    padding: 0.75rem !important;
+  }
+}
+
+/* Utilidades */
+.stack-mobile {
+  flex-direction: column;
+  align-items: stretch !important;
+}
+
+@media (min-width: 640px) {
+  .stack-mobile {
+    flex-direction: row;
+    align-items: center !important;
+  }
+}

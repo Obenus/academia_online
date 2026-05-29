@@ -5,13 +5,13 @@
 {% block content %}
 
 <!-- Header -->
-<div class="flex items-center justify-between mb-6">
-  <div class="flex items-center gap-3">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 page-head">
+  <div class="flex items-center gap-3 flex-wrap">
     <a href="{{ url_for('admin_dashboard') }}" class="text-sm hover:underline" style="color:var(--text3)">← Admin</a>
     <span style="color:var(--text4)">/</span>
     <h1 class="text-xl font-bold" style="color:var(--text1)">👥 Usuarios</h1>
   </div>
-  <div class="flex gap-2">
+  <div class="flex gap-2 page-head-actions w-full sm:w-auto">
     <a href="{{ url_for('admin_plans') }}" class="btn btn-secondary btn-sm">📋 Planes</a>
     <button onclick="document.getElementById('modal-nuevo').classList.remove('hidden')"
             class="btn btn-primary btn-sm">
@@ -31,9 +31,9 @@
 {% endwith %}
 
 <!-- ═══ MODAL NUEVO USUARIO ═══════════════════════════════════════════════════ -->
-<div id="modal-nuevo" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4"
+<div id="modal-nuevo" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-sheet"
      style="background:rgba(0,0,0,.45)">
-  <div class="w-full max-w-md rounded-2xl p-6 shadow-xl" style="background:var(--surface);border:1px solid var(--border)">
+  <div class="modal-panel w-full max-w-md rounded-2xl p-6 shadow-xl max-h-[92vh] overflow-y-auto" style="background:var(--surface);border:1px solid var(--border)">
     <div class="flex items-center justify-between mb-5">
       <h2 class="text-base font-bold" style="color:var(--text1)">➕ Crear nuevo usuario</h2>
       <button onclick="document.getElementById('modal-nuevo').classList.add('hidden')"
@@ -142,18 +142,17 @@
 
 <!-- ═══ TABLA DE USUARIOS ══════════════════════════════════════════════════════ -->
 <div>
-  <div class="flex items-center justify-between mb-3">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
     <h2 class="text-sm font-bold" style="color:var(--text1)">
       👤 Todos los usuarios
       <span class="font-normal text-xs ml-1" style="color:var(--text4)">({{ active|length }})</span>
     </h2>
-    <!-- Buscador rápido -->
     <input id="search-users" type="text" placeholder="🔍 Buscar…"
-           class="input text-sm" style="max-width:200px;padding:6px 12px"
+           class="input text-sm w-full sm:max-w-[220px]" style="padding:6px 12px"
            oninput="filterUsers(this.value)"/>
   </div>
 
-  <div class="rounded-xl overflow-hidden shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+  <div class="rounded-xl overflow-hidden shadow-sm table-scroll" style="background:var(--surface);border:1px solid var(--border)">
     <table class="w-full text-sm" id="users-table">
       <thead>
         <tr style="border-bottom:1px solid var(--border);background:var(--hover-bg)">

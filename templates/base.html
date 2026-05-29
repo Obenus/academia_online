@@ -144,7 +144,15 @@ document.addEventListener('DOMContentLoaded',function(){
   .file-upload-name { flex:1; font-size:12.5px; color:var(--text4); padding:8px 12px;
                       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .file-upload-name.has-file { color:var(--text2); font-weight:500; }
+
+  @media (max-width:767px) {
+    .page-head { flex-direction:column; align-items:flex-start !important; gap:0.75rem; }
+    .page-head .btn { width:100%; justify-content:center; }
+    .page-head-actions { width:100%; flex-wrap:wrap; }
+    .page-head-actions .btn { flex:1; min-width:0; justify-content:center; }
+  }
 </style>
+<link rel="stylesheet" href="/static/mobile.css"/>
 <!-- Apply saved theme before render to avoid flash -->
 <script>
   if (localStorage.getItem('theme') === 'dark') document.getElementById('html-root').classList.add('dark');
@@ -152,6 +160,9 @@ document.addEventListener('DOMContentLoaded',function(){
 {% block head %}{% endblock %}
 </head>
 <body>
+{% set ep = request.endpoint or '' %}
+{% set nav_formaciones = ep in ('courses', 'learn', 'course_detail', 'enroll_free', 'checkout', 'checkout_success')
+    or ep in ('features.take_quiz', 'features.submit_assignment', 'features.download_certificate') %}
 
 <!-- TOP HEADER -->
 <header class="fixed top-0 left-0 right-0 h-14 bg-white border-b border-[#e4e4e7] z-50 flex items-center px-4 gap-3">
@@ -169,7 +180,7 @@ document.addEventListener('DOMContentLoaded',function(){
       💬 Comunidad
     </a>
     <a href="{{ url_for('courses') }}"
-       class="tab-link {% if 'course' in (request.endpoint or '') or request.endpoint=='learn' %}active{% endif %}">
+       class="tab-link {% if nav_formaciones %}active{% endif %}">
       📚 Formaciones
     </a>
     <a href="{{ url_for('features.my_progress') }}"
@@ -246,6 +257,9 @@ document.addEventListener('DOMContentLoaded',function(){
         <a href="{{ url_for('account_settings') }}"
            class="flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5]"
            style="color:var(--text1)">⚙️ Mi cuenta</a>
+        <a href="{{ url_for('features.my_progress') }}"
+           class="flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5] md:hidden"
+           style="color:var(--text1)">📈 Mi progreso</a>
         {% if current_user.is_admin %}
         <a href="{{ url_for('admin_dashboard') }}"
            class="flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5] md:hidden"
@@ -266,7 +280,6 @@ document.addEventListener('DOMContentLoaded',function(){
 <!-- BARRA DE NAVEGACIÓN INFERIOR — solo móvil -->
 <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t"
      style="background:var(--surface);border-color:var(--border);padding-bottom:env(safe-area-inset-bottom)">
-  {% set ep = request.endpoint or '' %}
   <a href="{{ url_for('community') }}"
      class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-semibold transition
             {% if ep in ('community','post_detail','new_post') %}text-violet-600{% else %}text-[#a1a1aa]{% endif %}">
@@ -274,8 +287,8 @@ document.addEventListener('DOMContentLoaded',function(){
   </a>
   <a href="{{ url_for('courses') }}"
      class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-semibold transition
-            {% if 'course' in ep or ep=='learn' %}text-violet-600{% else %}text-[#a1a1aa]{% endif %}">
-    <span class="text-xl leading-none">📚</span>Cursos
+            {% if nav_formaciones %}text-violet-600{% else %}text-[#a1a1aa]{% endif %}">
+    <span class="text-xl leading-none">📚</span>Formaciones
   </a>
   <a href="{{ url_for('calendar') }}"
      class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-semibold transition
@@ -294,10 +307,10 @@ document.addEventListener('DOMContentLoaded',function(){
   </a>
 </nav>
 
-<main class="pt-14 pb-safe">
+<main class="pt-14 pb-6 main-with-bottom-nav md:pb-6">
   {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
-  <div class="fixed top-16 right-4 z-[70] space-y-2" style="max-width:min(380px,90vw)" id="flash-wrap">
+  <div class="fixed top-16 left-3 right-3 sm:left-auto sm:right-4 z-[70] space-y-2 sm:max-w-sm" id="flash-wrap">
     {% for cat, msg in messages %}
     <div class="flex items-start gap-3 px-4 py-3 rounded-xl text-sm font-medium shadow-lg border
       {% if cat=='error' %}bg-red-50 border-red-200 text-red-700
@@ -311,7 +324,7 @@ document.addEventListener('DOMContentLoaded',function(){
   {% endif %}
   {% endwith %}
 
-  <div class="px-4 py-5 md:p-6 {% block content_class %}max-w-5xl mx-auto{% endblock %}">
+  <div class="px-3 sm:px-4 py-4 sm:py-5 md:p-6 w-full max-w-full box-border {% block content_class %}max-w-5xl mx-auto{% endblock %}">
     {% block content %}{% endblock %}
   </div>
 </main>
