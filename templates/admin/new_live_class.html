@@ -1,12 +1,20 @@
 {% extends 'base.html' %}
-{% block title %}Nueva clase en directo{% endblock %}
+{% block title %}Nuevo evento — Calendario{% endblock %}
 
 {% block content %}
 <div class="max-w-lg">
   <a href="{{ url_for('admin_live_classes') }}" class="text-sm text-[#71717a] hover:text-[#18181b] mb-4 inline-flex items-center gap-1">← Volver</a>
-  <h1 class="text-xl font-bold text-[#18181b] mt-3 mb-6">📅 Programar clase en directo</h1>
+  <h1 class="text-xl font-bold text-[#18181b] mt-3 mb-6">📅 Nuevo evento en el calendario</h1>
   <div class="bg-white border border-[#e4e4e7] rounded-xl p-6 shadow-sm">
     <form method="POST" class="space-y-5">
+      <div>
+        <label class="block text-sm font-medium text-[#52525b] mb-1.5">Categoría *</label>
+        <select name="category_id" class="input" required>
+          {% for cat in categories %}
+          <option value="{{ cat.id }}">{{ cat.emoji }} {{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
       <div>
         <label class="block text-sm font-medium text-[#52525b] mb-1.5">Título *</label>
         <input type="text" name="title" class="input" placeholder="Ej: Sesión de preguntas y respuestas" required/>

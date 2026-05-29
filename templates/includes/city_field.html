@@ -1,0 +1,37 @@
+{# Requiere: city_state (selected, other, is_other), spanish_provinces, city_other_value, city_other_label #}
+<div class="field city-field-wrap {% if errors is defined and errors.city %}has-error{% endif %}">
+  <label class="block text-sm font-medium mb-1.5" style="color:var(--text2)">Ciudad (opcional)</label>
+  <select name="city" id="city-select" class="input" onchange="toggleCityOther(this)">
+    <option value="">— Selecciona provincia —</option>
+    {% for prov in spanish_provinces %}
+    <option value="{{ prov }}" {% if city_state.selected == prov %}selected{% endif %}>{{ prov }}</option>
+    {% endfor %}
+    <option value="{{ city_other_value }}" {% if city_state.is_other %}selected{% endif %}>{{ city_other_label }}</option>
+  </select>
+  <div id="city-other-wrap" class="mt-2 {% if not city_state.is_other %}hidden{% endif %}">
+    <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Escribe tu ciudad</label>
+    <input type="text" name="city_other" id="city-other-input" class="input"
+           placeholder="Nombre de tu ciudad"
+           value="{{ city_state.other or '' }}"/>
+  </div>
+  {% if errors is defined and errors.city %}
+  <p class="err-msg mt-1"><span>⚠</span> {{ errors.city }}</p>
+  {% endif %}
+</div>
+<script>
+function toggleCityOther(sel) {
+  const wrap = document.getElementById('city-other-wrap');
+  const inp = document.getElementById('city-other-input');
+  if (!wrap) return;
+  const show = sel && sel.value === '{{ city_other_value }}';
+  wrap.classList.toggle('hidden', !show);
+  if (inp) {
+    if (show) inp.setAttribute('required', 'required');
+    else { inp.removeAttribute('required'); inp.value = ''; }
+  }
+}
+document.addEventListener('DOMContentLoaded', function() {
+  const sel = document.getElementById('city-select');
+  if (sel) toggleCityOther(sel);
+});
+</script>

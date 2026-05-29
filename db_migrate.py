@@ -53,6 +53,14 @@ def run_migrations(conn):
             id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES "user"(id),
             course_id INTEGER NOT NULL REFERENCES course(id),
             certificate_code VARCHAR(32) UNIQUE NOT NULL, issued_at TIMESTAMP DEFAULT NOW())""",
+        """CREATE TABLE IF NOT EXISTS live_class_category (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(80) UNIQUE NOT NULL,
+            color VARCHAR(20) DEFAULT '#7c3aed',
+            emoji VARCHAR(10) DEFAULT '📅',
+            sort_order INTEGER DEFAULT 0)""",
+        "ALTER TABLE live_class ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES live_class_category(id)",
+        'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS city VARCHAR(120) DEFAULT \'\'',
     ]
     for sql in stmts:
         try:

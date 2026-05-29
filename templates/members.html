@@ -30,7 +30,10 @@
       <!-- Info -->
       <div class="flex-1 min-w-0">
         <p class="text-sm font-semibold leading-tight" style="color:var(--text1)">{{ u.username }}</p>
-        <p class="text-xs" style="color:var(--text4)">{{ u.email }}</p>
+        <p class="text-xs" style="color:var(--text4)">{{ u.email }}{% if u.city %} · 📍 {{ u.city }}{% endif %}</p>
+        {% if u.bio %}
+        <p class="text-xs mt-0.5" style="color:var(--text3)">«{{ u.bio[:80] }}{% if u.bio|length > 80 %}…{% endif %}»</p>
+        {% endif %}
         <p class="text-[10px]" style="color:var(--text4)">Solicitó acceso {{ u.created_at.strftime('%d/%m/%Y · %H:%M') }}</p>
       </div>
       <!-- Acciones -->

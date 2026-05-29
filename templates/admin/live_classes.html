@@ -1,11 +1,42 @@
 {% extends 'base.html' %}
-{% block title %}Clases en directo — Admin{% endblock %}
+{% block title %}Calendario — Admin{% endblock %}
 {% block content_class %}max-w-4xl mx-auto{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-6">
-  <h1 class="text-xl font-bold text-[#18181b]">🎥 Clases en directo</h1>
-  <a href="{{ url_for('admin_new_live_class') }}" class="btn btn-primary">➕ Nueva clase</a>
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+  <div>
+    <a href="{{ url_for('calendar') }}" class="text-sm text-[#71717a] hover:underline">← Calendario</a>
+    <h1 class="text-xl font-bold text-[#18181b] mt-1">📅 Gestión del calendario</h1>
+  </div>
+  <a href="{{ url_for('admin_new_live_class') }}" class="btn btn-primary">➕ Nuevo evento</a>
+</div>
+
+<div class="bg-white border border-[#e4e4e7] rounded-xl p-5 shadow-sm mb-6">
+  <h2 class="text-sm font-bold text-[#18181b] mb-3">🏷 Categorías de eventos</h2>
+  <div class="space-y-3 mb-4">
+    {% for cat in categories %}
+    <div class="flex flex-wrap items-center gap-2 p-3 rounded-lg" style="background:var(--hover-bg)">
+      <form method="POST" action="{{ url_for('admin_edit_calendar_category', cat_id=cat.id) }}"
+            class="flex flex-wrap items-center gap-2 flex-1">
+        <input type="text" name="emoji" class="input w-12 text-center" value="{{ cat.emoji }}" maxlength="4"/>
+        <input type="text" name="name" class="input flex-1 min-w-[120px]" value="{{ cat.name }}" required/>
+        <input type="color" name="color" value="{{ cat.color }}" class="h-10 w-10 rounded cursor-pointer"/>
+        <input type="number" name="sort_order" class="input w-16" value="{{ cat.sort_order }}" min="0" title="Orden"/>
+        <button type="submit" class="btn btn-secondary btn-sm">Guardar</button>
+      </form>
+      <form method="POST" action="{{ url_for('admin_delete_calendar_category', cat_id=cat.id) }}"
+            onsubmit="return confirm('¿Eliminar categoría?')">
+        <button type="submit" class="btn btn-secondary btn-sm text-red-500">✕</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  <form method="POST" action="{{ url_for('admin_new_calendar_category') }}" class="flex flex-wrap gap-2">
+    <input type="text" name="emoji" class="input w-12 text-center" placeholder="📅" maxlength="4"/>
+    <input type="text" name="name" class="input flex-1" placeholder="Nueva categoría" required/>
+    <input type="color" name="color" value="#7c3aed" class="h-10 w-10 rounded cursor-pointer"/>
+    <button type="submit" class="btn btn-secondary btn-sm">Añadir categoría</button>
+  </form>
 </div>
 
 {% if classes %}
@@ -13,20 +44,20 @@
   {% for lc in classes %}
   <div class="bg-white border border-[#e4e4e7] rounded-xl p-4 flex items-center gap-4 shadow-sm">
     <div class="flex-shrink-0 text-center rounded-xl px-3 py-2 min-w-[56px]"
-         style="background:#ede9fe;border:1px solid #c4b5fd">
-      <p class="text-xs font-bold" style="color:#7c3aed">{{ lc.scheduled_at.strftime('%b').upper() }}</p>
+         style="background:{{ (lc.category.color if lc.category else '#ede9fe') }}22;border:1px solid {{ (lc.category.color if lc.category else '#c4b5fd') }}">
+      <p class="text-xs font-bold" style="color:{{ lc.category.color if lc.category else '#7c3aed' }}">{{ lc.scheduled_at.strftime('%b').upper() }}</p>
       <p class="text-xl font-bold" style="color:#18181b">{{ lc.scheduled_at.strftime('%d') }}</p>
     </div>
     <div class="flex-1 min-w-0">
-      <p class="font-semibold text-[#18181b] text-sm">{{ lc.title }}</p>
-      <p class="text-xs text-violet-600 font-medium">{{ lc.scheduled_at.strftime('%H:%M') }} · {{ lc.duration_min }} min</p>
-      {% if lc.instructor %}<p class="text-xs text-[#71717a]">👤 {{ lc.instructor }}</p>{% endif %}
-      {% if lc.meet_url %}
-      <a href="{{ lc.meet_url }}" target="_blank" class="text-xs text-violet-500 hover:underline">🔗 {{ lc.meet_url[:50] }}</a>
+      {% if lc.category %}
+      <span class="text-[10px] font-semibold" style="color:{{ lc.category.color }}">{{ lc.category.emoji }} {{ lc.category.name }}</span>
       {% endif %}
+      <p class="font-semibold text-[#18181b] text-sm">{{ lc.title }}</p>
+      <p class="text-xs text-violet-600 font-medium">{{ lc.scheduled_at.strftime('%d/%m/%Y %H:%M') }} · {{ lc.duration_min }} min</p>
+      <a href="{{ url_for('admin_edit_live_class', class_id=lc.id) }}" class="text-xs text-violet-500 hover:underline">✏️ Editar</a>
     </div>
     <form method="POST" action="{{ url_for('admin_delete_live_class', class_id=lc.id) }}"
-          onsubmit="return confirm('¿Eliminar esta clase?')" class="flex-shrink-0">
+          onsubmit="return confirm('¿Eliminar este evento?')" class="flex-shrink-0">
       <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
     </form>
   </div>
@@ -35,8 +66,7 @@
 {% else %}
 <div class="bg-white border border-[#e4e4e7] rounded-xl p-16 text-center shadow-sm">
   <p class="text-4xl mb-3">📅</p>
-  <p class="text-[#71717a]">No hay clases programadas.</p>
-  <a href="{{ url_for('admin_new_live_class') }}" class="btn btn-primary mt-4 inline-flex">Programar primera clase</a>
+  <p class="text-[#71717a]">No hay eventos programados.</p>
 </div>
 {% endif %}
 {% endblock %}

@@ -65,9 +65,10 @@
         <label class="block text-xs font-medium mb-1.5" style="color:var(--text2)">Email</label>
         <input type="email" name="email" class="input" value="{{ current_user.email }}" required/>
       </div>
+      {% include 'includes/city_field.html' %}
       <div>
-        <label class="block text-xs font-medium mb-1.5" style="color:var(--text2)">Bio</label>
-        <textarea name="bio" class="input" rows="3" placeholder="Cuéntanos algo sobre ti...">{{ current_user.bio or '' }}</textarea>
+        <label class="block text-xs font-medium mb-1.5" style="color:var(--text2)">Qué necesito ahora (opcional)</label>
+        <textarea name="bio" class="input" rows="3" placeholder="Qué buscas o en qué te podemos ayudar...">{{ current_user.bio or '' }}</textarea>
       </div>
       <div class="flex justify-end">
         <button type="submit" class="btn btn-primary">Guardar cambios</button>

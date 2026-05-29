@@ -23,6 +23,7 @@ class User(UserMixin, db.Model):
     password_hash= db.Column(db.String(256))
     role         = db.Column(db.String(20), default='student')   # 'student' | 'admin'
     bio          = db.Column(db.Text, default='')
+    city         = db.Column(db.String(120), default='')
     created_at   = db.Column(db.DateTime, default=datetime.utcnow)
     last_seen    = db.Column(db.DateTime, nullable=True)
     avatar_data  = db.Column(db.LargeBinary, nullable=True)
@@ -268,6 +269,16 @@ class Notification(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class LiveClassCategory(db.Model):
+    __tablename__ = 'live_class_category'
+    id         = db.Column(db.Integer, primary_key=True)
+    name       = db.Column(db.String(80), unique=True, nullable=False)
+    color      = db.Column(db.String(20), default='#7c3aed')
+    emoji      = db.Column(db.String(10), default='📅')
+    sort_order = db.Column(db.Integer, default=0)
+    live_classes = db.relationship('LiveClass', backref='category', lazy=True)
+
+
 class LiveClass(db.Model):
     id           = db.Column(db.Integer, primary_key=True)
     title        = db.Column(db.String(200), nullable=False)
@@ -278,6 +289,7 @@ class LiveClass(db.Model):
     instructor   = db.Column(db.String(100), default='')
     recurrence   = db.Column(db.String(10), default='none')  # 'none' | 'weekly' | 'monthly'
     parent_id    = db.Column(db.Integer, db.ForeignKey('live_class.id'), nullable=True)
+    category_id  = db.Column(db.Integer, db.ForeignKey('live_class_category.id'), nullable=True)
 
 
 class Quiz(db.Model):

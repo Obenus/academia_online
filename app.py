@@ -19,7 +19,12 @@ from sqlalchemy import text
 from models import (db, User, Category, Post, Comment,
                     Course, Section, Lesson, LessonFile, LessonImage, Enrollment, LessonProgress, LiveClass,
                     SiteSettings, PointEvent, Notification, SubscriptionPlan,
-                    Quiz, Assignment, PostReport, CourseCertificate)
+                    Quiz, Assignment, PostReport, CourseCertificate, LiveClassCategory)
+from calendar_categories import ensure_calendar_categories, category_event_colors
+from spain_provinces import (
+    SPANISH_PROVINCES, CITY_OTHER_VALUE, CITY_OTHER_LABEL,
+    parse_city_from_form, city_form_state, city_form_from_request,
+)
 from extensions import csrf, limiter, init_security
 from learning_utils import (
     course_progress, ordered_lessons, completed_lesson_ids,
@@ -206,9 +211,21 @@ def get_settings():
 def inject_settings():
     try:
         from flask_wtf.csrf import generate_csrf
-        return {'site': get_settings(), 'csrf_token': generate_csrf}
+        return {
+            'site': get_settings(),
+            'csrf_token': generate_csrf,
+            'spanish_provinces': SPANISH_PROVINCES,
+            'city_other_value': CITY_OTHER_VALUE,
+            'city_other_label': CITY_OTHER_LABEL,
+        }
     except Exception:
-        return {'site': SiteSettings(), 'csrf_token': lambda: ''}
+        return {
+            'site': SiteSettings(),
+            'csrf_token': lambda: '',
+            'spanish_provinces': SPANISH_PROVINCES,
+            'city_other_value': CITY_OTHER_VALUE,
+            'city_other_label': CITY_OTHER_LABEL,
+        }
 
 app.register_blueprint(features_bp)
 register_bulk_email_routes(app, mail, get_settings)
@@ -334,8 +351,9 @@ def register():
         billing_interval = request.form.get('billing_interval', 'month')
         promo_code = request.form.get('promo_code', '').strip()
 
-        form = {'username': username, 'email': email, 'bio': bio, 'plan_id': plan_id,
-                'billing_interval': billing_interval, 'promo_code': promo_code}
+        city = parse_city_from_form(request.form)
+        form = {'username': username, 'email': email, 'bio': bio,
+                'plan_id': plan_id, 'billing_interval': billing_interval, 'promo_code': promo_code}
 
         if not username or len(username) < 3:
             errors['username'] = 'El nombre debe tener al menos 3 caracteres.'
@@ -350,11 +368,8 @@ def register():
         if not pw or len(pw) < 6:
             errors['password'] = 'La contraseña debe tener al menos 6 caracteres.'
 
-        if not bio:
-            errors['bio'] = 'Cuéntanos algo sobre ti.'
-
-        if not avatar or not avatar.filename:
-            errors['avatar'] = 'La foto de perfil es obligatoria.'
+        if request.form.get('city') == CITY_OTHER_VALUE and not request.form.get('city_other', '').strip():
+            errors['city'] = 'Indica el nombre de tu ciudad.'
 
         plan = None
         if pay_on:
@@ -366,13 +381,17 @@ def register():
                     errors['plan'] = 'Plan no válido.'
 
         if not errors:
-            raw_avatar = avatar.read()
-            if len(raw_avatar) > 4 * 1024 * 1024:
-                errors['avatar'] = 'La imagen no puede superar 4 MB.'
-            else:
-                avatar_data, avatar_mime = _compress_image(
-                    raw_avatar, max_w=300, max_h=300, quality=82, square=True)
-                user = User(username=username, email=email, bio=bio,
+            avatar_data, avatar_mime = None, 'image/jpeg'
+            if avatar and avatar.filename:
+                raw_avatar = avatar.read()
+                if len(raw_avatar) > 4 * 1024 * 1024:
+                    errors['avatar'] = 'La imagen no puede superar 4 MB.'
+                else:
+                    avatar_data, avatar_mime = _compress_image(
+                        raw_avatar, max_w=300, max_h=300, quality=82, square=True)
+
+            if not errors:
+                user = User(username=username, email=email, bio=bio, city=city,
                             avatar_data=avatar_data, avatar_mime=avatar_mime,
                             status='pending', billing_type='standard',
                             subscription_plan_id=plan.id if plan else None)
@@ -395,7 +414,7 @@ def register():
                         db.session.delete(user)
                         db.session.commit()
                         errors['plan'] = f'No se pudo iniciar el pago: {e}'
-                else:
+                elif not errors:
                     for admin in User.query.filter_by(role='admin').all():
                         notify(admin.id, 'new_user',
                                f'🙋 Nueva solicitud de acceso de {username} ({email})',
@@ -409,9 +428,12 @@ def register():
                     return render_template('auth/pending.html')
 
     site = get_settings()
+    city_state = (city_form_from_request(request.form) if request.method == 'POST'
+                  else city_form_state(''))
     return render_template(
         'auth/register.html',
         errors=errors, form=form, plans=plans, pay_on=pay_on,
+        city_state=city_state,
         stripe_pk=get_stripe_public(app),
         academy_name=site.academy_name if site else app.config.get('ACADEMY_NAME', 'Academia'),
     )
@@ -491,6 +513,7 @@ def account_settings():
             new_username = request.form.get('username', '').strip()
             new_email    = request.form.get('email', '').strip()
             new_bio      = request.form.get('bio', '').strip()
+            new_city = parse_city_from_form(request.form)
             if new_username and new_username != current_user.username:
                 if User.query.filter_by(username=new_username).first():
                     flash('Ese nombre de usuario ya está en uso.', 'error')
@@ -502,6 +525,7 @@ def account_settings():
                     return redirect(url_for('account_settings'))
                 current_user.email = new_email
             current_user.bio = new_bio
+            current_user.city = new_city
             db.session.commit()
             flash('Perfil actualizado.', 'success')
 
@@ -535,7 +559,10 @@ def account_settings():
             flash('Contraseña actualizada.', 'success')
 
         return redirect(url_for('account_settings'))
-    return render_template('account_settings.html')
+    return render_template(
+        'account_settings.html',
+        city_state=city_form_state(current_user.city),
+    )
 
 # ── COMMUNITY ─────────────────────────────────────────────────────────────────
 
@@ -875,10 +902,14 @@ def leaderboard():
 @app.route('/calendario')
 @login_required
 def calendar():
-    upcoming = LiveClass.query.filter(
-        LiveClass.scheduled_at >= datetime.utcnow()
-    ).order_by(LiveClass.scheduled_at).limit(5).all()
-    return render_template('calendar/index.html', upcoming=upcoming)
+    upcoming = (LiveClass.query
+                .filter(LiveClass.scheduled_at >= datetime.utcnow())
+                .order_by(LiveClass.scheduled_at)
+                .limit(8).all())
+    categories = LiveClassCategory.query.order_by(
+        LiveClassCategory.sort_order, LiveClassCategory.name
+    ).all()
+    return render_template('calendar/index.html', upcoming=upcoming, categories=categories)
 
 @app.route('/calendario/data')
 @login_required
@@ -887,9 +918,16 @@ def calendar_data():
     events  = []
     for c in classes:
         end = c.scheduled_at + timedelta(minutes=c.duration_min) if c.duration_min else None
+        cat = c.category
+        bg, border = category_event_colors(cat)
+        prefix = ''
+        if c.recurrence != 'none':
+            prefix = '🔁 '
+        elif cat and cat.emoji:
+            prefix = cat.emoji + ' '
         events.append({
             'id':    c.id,
-            'title': ('🔁 ' if c.recurrence != 'none' else '') + c.title,
+            'title': prefix + c.title,
             'start': c.scheduled_at.isoformat(),
             'end':   end.isoformat() if end else None,
             'extendedProps': {
@@ -897,9 +935,11 @@ def calendar_data():
                 'meet_url':    c.meet_url,
                 'instructor':  c.instructor,
                 'duration':    c.duration_min,
+                'category':    cat.name if cat else '',
+                'category_color': cat.color if cat else '',
             },
-            'backgroundColor': '#6366f1',
-            'borderColor':     '#4f46e5',
+            'backgroundColor': bg,
+            'borderColor':     border,
         })
     return jsonify(events)
 
@@ -1789,7 +1829,61 @@ def serve_lesson_image(image_id):
 @admin_required
 def admin_live_classes():
     classes = LiveClass.query.order_by(LiveClass.scheduled_at.desc()).all()
-    return render_template('admin/live_classes.html', classes=classes)
+    categories = LiveClassCategory.query.order_by(
+        LiveClassCategory.sort_order, LiveClassCategory.name
+    ).all()
+    return render_template('admin/live_classes.html', classes=classes, categories=categories)
+
+
+@app.route('/admin/calendario/categorias/nueva', methods=['POST'])
+@login_required
+@admin_required
+def admin_new_calendar_category():
+    name = request.form.get('name', '').strip().lower()
+    color = request.form.get('color', '#7c3aed').strip()
+    emoji = request.form.get('emoji', '📅').strip() or '📅'
+    if name and not LiveClassCategory.query.filter_by(name=name).first():
+        db.session.add(LiveClassCategory(
+            name=name, color=color, emoji=emoji,
+            sort_order=LiveClassCategory.query.count(),
+        ))
+        db.session.commit()
+        flash(f'Categoría «{name}» creada.', 'success')
+    else:
+        flash('Nombre de categoría no válido o ya existente.', 'error')
+    return redirect(url_for('admin_live_classes'))
+
+
+@app.route('/admin/calendario/categorias/<int:cat_id>/editar', methods=['POST'])
+@login_required
+@admin_required
+def admin_edit_calendar_category(cat_id):
+    cat = LiveClassCategory.query.get_or_404(cat_id)
+    cat.name = request.form.get('name', cat.name).strip().lower()
+    cat.color = request.form.get('color', cat.color).strip()
+    cat.emoji = request.form.get('emoji', cat.emoji).strip() or '📅'
+    try:
+        cat.sort_order = int(request.form.get('sort_order', cat.sort_order) or 0)
+    except ValueError:
+        pass
+    db.session.commit()
+    flash('Categoría actualizada.', 'success')
+    return redirect(url_for('admin_live_classes'))
+
+
+@app.route('/admin/calendario/categorias/<int:cat_id>/borrar', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_calendar_category(cat_id):
+    cat = LiveClassCategory.query.get_or_404(cat_id)
+    in_use = LiveClass.query.filter_by(category_id=cat.id).count()
+    if in_use:
+        flash(f'No se puede eliminar: {in_use} evento(s) usan esta categoría.', 'error')
+    else:
+        db.session.delete(cat)
+        db.session.commit()
+        flash('Categoría eliminada.', 'success')
+    return redirect(url_for('admin_live_classes'))
 
 @app.route('/admin/clases/nueva', methods=['GET', 'POST'])
 @login_required
@@ -1802,6 +1896,7 @@ def admin_new_live_class():
             scheduled_at = datetime.fromisoformat(date_str)
         except Exception:
             scheduled_at = datetime.utcnow()
+        category_id = request.form.get('category_id', type=int)
         lc = LiveClass(
             title        = request.form.get('title', '').strip(),
             description  = request.form.get('description', '').strip(),
@@ -1810,6 +1905,7 @@ def admin_new_live_class():
             meet_url     = request.form.get('meet_url', '').strip(),
             instructor   = request.form.get('instructor', '').strip(),
             recurrence   = recurrence,
+            category_id  = category_id,
         )
         db.session.add(lc)
         db.session.flush()  # get lc.id before commit
@@ -1835,6 +1931,7 @@ def admin_new_live_class():
                     instructor   = lc.instructor,
                     recurrence   = recurrence,
                     parent_id    = lc.id,
+                    category_id  = lc.category_id,
                 ))
 
         db.session.commit()
@@ -1848,7 +1945,10 @@ def admin_new_live_class():
         label = {'weekly': 'semanal', 'monthly': 'mensual'}.get(recurrence, '')
         flash(f'Clase programada{"  (recurrencia " + label + ")" if label else ""}.', 'success')
         return redirect(url_for('admin_live_classes'))
-    return render_template('admin/new_live_class.html')
+    categories = LiveClassCategory.query.order_by(
+        LiveClassCategory.sort_order, LiveClassCategory.name
+    ).all()
+    return render_template('admin/new_live_class.html', categories=categories)
 
 @app.route('/admin/clases/<int:class_id>/editar', methods=['GET', 'POST'])
 @login_required
@@ -1861,6 +1961,7 @@ def admin_edit_live_class(class_id):
         lc.meet_url     = request.form.get('meet_url', '').strip()
         lc.instructor   = request.form.get('instructor', '').strip()
         lc.duration_min = int(request.form.get('duration', 60) or 60)
+        lc.category_id = request.form.get('category_id', type=int)
         try:
             lc.scheduled_at = datetime.fromisoformat(request.form.get('scheduled_at', ''))
         except Exception:
@@ -1874,11 +1975,16 @@ def admin_edit_live_class(class_id):
                 child.meet_url     = lc.meet_url
                 child.instructor   = lc.instructor
                 child.duration_min = lc.duration_min
+                child.category_id  = lc.category_id
         db.session.commit()
-        flash('Clase actualizada.', 'success')
+        flash('Evento actualizado.', 'success')
         return redirect(url_for('calendar'))
     scheduled_str = lc.scheduled_at.strftime('%Y-%m-%dT%H:%M')
-    return render_template('admin/edit_live_class.html', lc=lc, scheduled_str=scheduled_str)
+    categories = LiveClassCategory.query.order_by(
+        LiveClassCategory.sort_order, LiveClassCategory.name
+    ).all()
+    return render_template('admin/edit_live_class.html', lc=lc, scheduled_str=scheduled_str,
+                           categories=categories)
 
 @app.route('/admin/clases/<int:class_id>/borrar', methods=['POST'])
 @login_required
@@ -4221,6 +4327,10 @@ with app.app_context():
             conn.commit()
     except Exception:
         pass
+    try:
+        ensure_calendar_categories()
+    except Exception as e:
+        print(f'[calendar] seed categories: {e}')
     sk = app.config.get('SECRET_KEY', '')
     if not sk or sk == 'cambiar-en-produccion-secret-key-aqui':
         print('[SECURITY] ⚠️ SECRET_KEY por defecto — configura secrets/secret_key antes de producción.')

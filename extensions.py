@@ -46,12 +46,16 @@ def _init_talisman(app, force_https=False):
         session_cookie_secure=force_https,
         content_security_policy={
             'default-src': "'self'",
-            'script-src': ["'self'", "'unsafe-inline'", 'https://js.stripe.com'],
-            'style-src': ["'self'", "'unsafe-inline'"],
+            'script-src': [
+                "'self'", "'unsafe-inline'",
+                'https://js.stripe.com',
+                'https://cdn.jsdelivr.net',
+            ],
+            'style-src': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
             'img-src': ["'self'", 'data:', 'https:', 'blob:'],
             'frame-src': ["'self'", 'https://www.youtube.com', 'https://player.vimeo.com', 'https://js.stripe.com'],
             'connect-src': ["'self'", 'https://api.stripe.com'],
-            'font-src': ["'self'", 'data:'],
+            'font-src': ["'self'", 'data:', 'https://cdn.jsdelivr.net'],
         },
         content_security_policy_nonce_in=[],
     )

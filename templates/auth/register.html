@@ -49,10 +49,10 @@
           📷
         </div>
         <label class="cursor-pointer text-sm font-medium {% if errors.avatar %}text-red-500{% else %}text-violet-600 hover:text-violet-700{% endif %}">
-          Subir foto de perfil *
+          Subir foto de perfil (opcional)
           <input type="file" name="avatar" accept="image/*" class="hidden" onchange="previewAvatar(event)" id="avatar-input"/>
         </label>
-        <p class="text-xs text-[#a1a1aa]">JPG o PNG · Máx. 4 MB · Obligatoria</p>
+        <p class="text-xs text-[#a1a1aa]">JPG o PNG · Máx. 4 MB · Opcional</p>
         {% if errors.avatar %}
         <p class="err-msg"><span>⚠</span> {{ errors.avatar }}</p>
         {% endif %}
@@ -136,10 +136,13 @@
       </div>
       {% endif %}
 
-      <!-- Bio -->
+      {% include 'includes/city_field.html' %}
+
+      <!-- Qué necesito ahora -->
       <div class="field {% if errors.bio %}has-error{% endif %}">
-        <label class="block text-sm font-medium text-[#52525b] mb-1.5">Cuéntanos sobre ti *</label>
-        <textarea name="bio" placeholder="¿Quién eres y por qué quieres unirte?"
+        <label class="block text-sm font-medium text-[#52525b] mb-1.5">Qué necesito ahora (opcional)</label>
+        <textarea name="bio" rows="3" class="input"
+                  placeholder="Cuéntanos qué buscas o en qué te podemos ayudar..."
                   oninput="clearErr(this, 'err-bio')">{{ form.get('bio', '') }}</textarea>
         {% if errors.bio %}
         <p class="err-msg" id="err-bio"><span>⚠</span> {{ errors.bio }}</p>
@@ -213,7 +216,6 @@ document.getElementById('reg-form').addEventListener('submit', function(e) {
     { name: 'username', min: 3, msg: 'El nombre debe tener al menos 3 caracteres.' },
     { name: 'email',    min: 5, msg: 'Introduce un email válido.' },
     { name: 'password', min: 6, msg: 'La contraseña debe tener al menos 6 caracteres.' },
-    { name: 'bio',      min: 1, msg: 'Cuéntanos algo sobre ti.' },
   ];
   fields.forEach(f => {
     const el = this.elements[f.name];
@@ -232,21 +234,6 @@ document.getElementById('reg-form').addEventListener('submit', function(e) {
       if (ok) { el.focus(); ok = false; }
     }
   });
-  // Check avatar
-  const av = document.getElementById('avatar-input');
-  if (av && !av.files.length) {
-    const wrap = av.closest('.field');
-    wrap.classList.add('has-error');
-    const preview = document.getElementById('avatar-preview');
-    preview.classList.add('bg-red-50','ring-2','ring-red-300');
-    if (!wrap.querySelector('.err-msg')) {
-      const p = document.createElement('p');
-      p.className = 'err-msg';
-      p.innerHTML = '<span>⚠</span> La foto de perfil es obligatoria.';
-      wrap.appendChild(p);
-    }
-    ok = false;
-  }
   if (!ok) e.preventDefault();
 });
 </script>

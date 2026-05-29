@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded',function(){
     </a>
     <a href="{{ url_for('calendar') }}"
        class="tab-link {% if request.endpoint=='calendar' %}active{% endif %}">
-      🎥 Clases
+      📅 Calendario
     </a>
     <a href="{{ url_for('leaderboard') }}"
        class="tab-link {% if request.endpoint=='leaderboard' %}active{% endif %}">
@@ -280,7 +280,7 @@ document.addEventListener('DOMContentLoaded',function(){
   <a href="{{ url_for('calendar') }}"
      class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-semibold transition
             {% if ep=='calendar' %}text-violet-600{% else %}text-[#a1a1aa]{% endif %}">
-    <span class="text-xl leading-none">🎥</span>Clases
+    <span class="text-xl leading-none">📅</span>Calendario
   </a>
   <a href="{{ url_for('leaderboard') }}"
      class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-semibold transition

@@ -81,7 +81,8 @@ def default_admin_reg_body():
 <li><strong>Fecha registro:</strong> {{created_at}}</li>
 <li><strong>Plan:</strong> {{plan_name}} ({{plan_price}})</li>
 <li><strong>Estado cuenta:</strong> {{status}}</li>
-<li><strong>Bio:</strong> {{bio}}</li>
+<li><strong>Qué necesito ahora:</strong> {{bio}}</li>
+<li><strong>Ciudad:</strong> {{city}}</li>
 </ul>
 <p style="color:#71717a;font-size:12px">Revisa el panel de administración para aprobar o gestionar la cuenta.</p>"""
 
@@ -131,6 +132,7 @@ def send_admin_registration_email(app, mail, user, plan_name, status_label, plan
         'username': user.username,
         'email': user.email,
         'bio': user.bio or '—',
+        'city': user.city or '—',
         'plan_name': plan_name or '—',
         'plan_price': plan_price,
         'created_at': created,
@@ -271,7 +273,8 @@ def send_test_template_email(app, mail, to_email, subject_tpl, body_tpl, sample_
         'academy_name': academy,
         'login_url': 'https://ejemplo.com/login',
         'approval_note': '<p>(Nota de prueba)</p>',
-        'bio': 'Bio de ejemplo',
+        'bio': 'Ejemplo de necesidad',
+        'city': 'Madrid',
         'created_at': '01/01/2026 10:00',
         'status': 'Activo',
     }

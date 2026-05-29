@@ -117,8 +117,11 @@
             <p class="text-xs" style="color:var(--text3)">{{ user.email }}</p>
             <p class="text-xs" style="color:var(--text4)">📅 {{ user.created_at.strftime('%d %b %Y · %H:%M') }}</p>
           </div>
+          {% if user.city %}
+          <p class="text-xs mt-1" style="color:var(--text3)">📍 {{ user.city }}</p>
+          {% endif %}
           {% if user.bio %}
-          <p class="text-sm mt-1" style="color:var(--text2)">{{ user.bio }}</p>
+          <p class="text-sm mt-1" style="color:var(--text2)"><span class="text-xs font-semibold" style="color:var(--text4)">Qué necesito ahora:</span> {{ user.bio }}</p>
           {% endif %}
         </div>
         <div class="flex gap-2 flex-shrink-0">
