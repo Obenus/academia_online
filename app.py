@@ -1225,6 +1225,10 @@ def admin_settings():
         s.welcome_email_body = request.form.get('welcome_email_body', '').strip()
         s.admin_reg_email_subject = request.form.get('admin_reg_email_subject', '').strip()
         s.admin_reg_email_body = request.form.get('admin_reg_email_body', '').strip()
+        s.event_reminder_email_subject = request.form.get('event_reminder_email_subject', '').strip()
+        s.event_reminder_email_body = request.form.get('event_reminder_email_body', '').strip()
+        s.event_reminder_24h_enabled = request.form.get('event_reminder_24h_enabled') == 'on'
+        s.event_reminder_1h_enabled = request.form.get('event_reminder_1h_enabled') == 'on'
         img = request.files.get('community_image_file')
         if img and img.filename:
             s.community_image_data, s.community_image_mime = _compress_image(
@@ -1236,6 +1240,7 @@ def admin_settings():
     from billing import (
         default_welcome_subject, default_welcome_body,
         default_admin_reg_subject, default_admin_reg_body,
+        default_event_reminder_subject, default_event_reminder_body,
     )
     return render_template(
         'admin/settings.html', s=s,
@@ -1243,6 +1248,8 @@ def admin_settings():
         default_welcome_body=default_welcome_body(),
         default_admin_subject=default_admin_reg_subject(),
         default_admin_body=default_admin_reg_body(),
+        default_event_reminder_subject=default_event_reminder_subject(),
+        default_event_reminder_body=default_event_reminder_body(),
     )
 
 
@@ -4291,6 +4298,10 @@ with app.app_context():
             conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS welcome_email_body TEXT DEFAULT ''"))
             conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS admin_reg_email_subject VARCHAR(300) DEFAULT ''"))
             conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS admin_reg_email_body TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_email_subject VARCHAR(300) DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_email_body TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_24h_enabled BOOLEAN DEFAULT TRUE"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_1h_enabled BOOLEAN DEFAULT TRUE"))
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS subscription_plan (
                     id SERIAL PRIMARY KEY,

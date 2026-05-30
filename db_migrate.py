@@ -61,6 +61,10 @@ def run_migrations(conn):
             sort_order INTEGER DEFAULT 0)""",
         "ALTER TABLE live_class ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES live_class_category(id)",
         'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS city VARCHAR(120) DEFAULT \'\'',
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_email_subject VARCHAR(300) DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_email_body TEXT DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_24h_enabled BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_1h_enabled BOOLEAN DEFAULT TRUE",
     ]
     for sql in stmts:
         try:

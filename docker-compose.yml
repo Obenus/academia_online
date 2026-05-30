@@ -10,6 +10,7 @@ services:
       PORT: 5000
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/miacademia}
       ACADEMY_NAME: ${ACADEMY_NAME:-Marca Atractora}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:-}
       MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
@@ -53,6 +54,7 @@ services:
       MAIL_USE_TLS: ${MAIL_USE_TLS:-true}
       MAIL_USE_SSL: ${MAIL_USE_SSL:-false}
       ACADEMY_NAME: ${ACADEMY_NAME:-Marca Atractora}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       SECRET_KEY_FILE: /run/secrets/secret_key
       MAIL_USERNAME_FILE: /run/secrets/mail_username
       MAIL_PASSWORD_FILE: /run/secrets/mail_password

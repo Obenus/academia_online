@@ -73,6 +73,65 @@ def default_admin_reg_subject():
     return 'Nuevo registro: {{username}}'
 
 
+def default_event_reminder_subject():
+    return 'Recordatorio: {{event_title}} — {{reminder_label}}'
+
+
+def default_event_reminder_body():
+    return """<p>Hola <strong>{{username}}</strong>,</p>
+<p>Te recordamos el evento <strong>{{event_title}}</strong> ({{reminder_label}}).</p>
+<p>📅 <strong>{{event_datetime}}</strong></p>
+<p>⏱ Duración aproximada: {{event_duration}} min</p>
+{{meet_link_block}}
+<p style="color:#71717a;font-size:12px">También puedes verlo en el <a href="{{calendar_url}}">calendario de la academia</a>.</p>"""
+
+
+def reminder_label_for_type(reminder_type):
+    if reminder_type == '24h':
+        return 'en 24 horas'
+    if reminder_type == '1h':
+        return 'en 1 hora'
+    return reminder_type
+
+
+def send_event_reminder_email(app, mail, user, live_class, reminder_type, site=None, calendar_url=''):
+    s = site or _payment_settings(app)
+    subject_tpl = (
+        (s.event_reminder_email_subject if s and s.event_reminder_email_subject else None)
+        or default_event_reminder_subject()
+    )
+    body_tpl = (
+        (s.event_reminder_email_body if s and s.event_reminder_email_body else None)
+        or default_event_reminder_body()
+    )
+    academy = (s.academy_name if s and s.academy_name else None) or app.config.get('ACADEMY_NAME', 'Academia')
+    when = live_class.scheduled_at.strftime('%d/%m/%Y %H:%M UTC')
+    meet_block = ''
+    if live_class.meet_url:
+        meet_block = (
+            f'<p><a href="{escape(live_class.meet_url)}" '
+            f'style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;'
+            f'border-radius:8px;text-decoration:none;font-weight:600">🎥 Unirse al evento</a></p>'
+        )
+    ctx = {
+        'username': user.username,
+        'email': user.email,
+        'academy_name': academy,
+        'event_title': live_class.title,
+        'event_datetime': when,
+        'event_duration': live_class.duration_min or '—',
+        'meet_url': live_class.meet_url or '',
+        'meet_link_block': meet_block,
+        'reminder_type': reminder_type,
+        'reminder_label': reminder_label_for_type(reminder_type),
+        'calendar_url': calendar_url or '#',
+        'instructor': live_class.instructor or '',
+    }
+    subject = render_template_vars(subject_tpl, **ctx)
+    inner = render_template_vars(body_tpl, **ctx)
+    return send_html_email(app, mail, [user.email], subject, email_wrapper(academy, inner))
+
+
 def default_admin_reg_body():
     return """<p>Se ha registrado un nuevo usuario en la plataforma:</p>
 <ul>

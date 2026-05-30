@@ -1,33 +1,17 @@
 #!/usr/bin/env python3
-"""Worker: recordatorios por email 24h y 1h antes de clases en directo."""
+"""Worker: recordatorios por email 24h y 1h antes de eventos del calendario."""
 import os
 import time
 from datetime import datetime, timedelta
 
 from app import app, mail
 from models import db, User, LiveClass, LiveClassReminderLog, SiteSettings
-from billing import send_html_email, email_wrapper, _mail_configured
+from billing import _mail_configured, send_event_reminder_email
 
 
 def _window(now, hours_ahead, tolerance_min=15):
     target = now + timedelta(hours=hours_ahead)
     return target - timedelta(minutes=tolerance_min), target + timedelta(minutes=tolerance_min)
-
-
-def _send_reminder(lc, user, rtype, site):
-    subject = f'Recordatorio: {lc.title} ({rtype})'
-    when = lc.scheduled_at.strftime('%d/%m/%Y %H:%M UTC')
-    inner = f"""<p>Hola <strong>{user.username}</strong>,</p>
-<p>Te recordamos la clase en directo <strong>{lc.title}</strong>.</p>
-<p>📅 <strong>{when}</strong></p>
-<p>⏱ Duración aproximada: {lc.duration_min} min</p>
-{f'<p><a href="{lc.meet_url}">Unirse a la clase</a></p>' if lc.meet_url else ''}
-<p style="color:#71717a;font-size:12px">También puedes verla en el calendario de la academia.</p>"""
-    academy = site.academy_name if site else 'Academia'
-    return send_html_email(
-        app, mail, [user.email], subject,
-        email_wrapper(academy, inner),
-    )
 
 
 def run_once():
@@ -36,11 +20,26 @@ def run_once():
             print('[reminder] MAIL no configurado, omitiendo.')
             return
         site = SiteSettings.query.first()
+        base = app.config.get('PUBLIC_BASE_URL', '').strip().rstrip('/')
+        if base:
+            calendar_url = f'{base}/calendario'
+        else:
+            from flask import url_for
+            with app.test_request_context('/'):
+                calendar_url = url_for('calendar', _external=True)
+
         now = datetime.utcnow()
         users = User.query.filter_by(status='active').filter(User.role != 'rejected').all()
         classes = LiveClass.query.filter(LiveClass.scheduled_at > now).all()
 
+        reminder_enabled = {
+            '24h': not site or site.event_reminder_24h_enabled is not False,
+            '1h': not site or site.event_reminder_1h_enabled is not False,
+        }
+
         for rtype, hours in (('24h', 24), ('1h', 1)):
+            if not reminder_enabled.get(rtype, True):
+                continue
             start, end = _window(now, hours)
             for lc in classes:
                 if not (start <= lc.scheduled_at <= end):
@@ -54,7 +53,9 @@ def run_once():
                     if exists:
                         continue
                     try:
-                        if _send_reminder(lc, user, rtype, site):
+                        if send_event_reminder_email(
+                            app, mail, user, lc, rtype, site=site, calendar_url=calendar_url,
+                        ):
                             db.session.add(LiveClassReminderLog(
                                 live_class_id=lc.id, user_id=user.id, reminder_type=rtype,
                             ))

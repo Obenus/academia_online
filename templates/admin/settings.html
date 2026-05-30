@@ -47,7 +47,7 @@
 
     <hr style="border-color:var(--border)"/>
     <h2 class="text-lg font-semibold" style="color:var(--text1)" id="emails">📧 Emails automáticos</h2>
-    <p class="text-xs mb-3" style="color:var(--text4)">Al registrarse (y tras confirmar el pago). HTML y variables entre llaves.</p>
+    <p class="text-xs mb-3" style="color:var(--text4)">Plantillas HTML con variables <code>{{nombre}}</code>. Requiere SMTP (MAIL_* en Docker). Los recordatorios de eventos los envía el servicio <code>reminder</code> (24 h y 1 h antes).</p>
 
     <h3 class="text-sm font-semibold" style="color:var(--text1)">Bienvenida (usuario)</h3>
     <p class="text-[11px] mb-2" style="color:var(--text4)">Variables: {% raw %}<code>{{username}}</code>, <code>{{email}}</code>, <code>{{plan_name}}</code>, <code>{{academy_name}}</code>, <code>{{login_url}}</code>, <code>{{approval_note}}</code>{% endraw %}</p>
@@ -60,7 +60,29 @@
     <input type="text" name="admin_reg_email_subject" class="input mb-2"
            value="{{ s.admin_reg_email_subject or default_admin_subject }}"/>
     <textarea name="admin_reg_email_body" class="input" rows="7">{{ s.admin_reg_email_body or default_admin_body }}</textarea>
-    <p class="text-[11px] mt-1" style="color:var(--text4)">Requiere SMTP configurado (MAIL_* en Docker).</p>
+
+    <h3 class="text-sm font-semibold mt-4" style="color:var(--text1)">Recordatorio de eventos (calendario)</h3>
+    <div class="flex flex-col sm:flex-row gap-3 mb-3 p-3 rounded-lg" style="background:var(--faint);border:1px solid var(--border)">
+      <label class="flex items-center gap-2 text-sm cursor-pointer" style="color:var(--text2)">
+        <input type="checkbox" name="event_reminder_24h_enabled" value="on"
+               class="w-4 h-4 rounded border-zinc-300 text-violet-600"
+               {% if s.event_reminder_24h_enabled != False %}checked{% endif %}/>
+        Enviar email <strong>24 h</strong> antes del evento
+      </label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer" style="color:var(--text2)">
+        <input type="checkbox" name="event_reminder_1h_enabled" value="on"
+               class="w-4 h-4 rounded border-zinc-300 text-violet-600"
+               {% if s.event_reminder_1h_enabled != False %}checked{% endif %}/>
+        Enviar email <strong>1 h</strong> antes del evento
+      </label>
+    </div>
+    <p class="text-[11px] mb-2" style="color:var(--text4)">
+      Los avisos dentro de la app no dependen de estas casillas. Plantilla compartida para ambos envíos. Variables:
+      {% raw %}<code>{{username}}</code>, <code>{{event_title}}</code>, <code>{{event_datetime}}</code>, <code>{{event_duration}}</code>, <code>{{reminder_label}}</code> (en 24 horas / en 1 hora), <code>{{meet_link_block}}</code> (botón si hay enlace), <code>{{calendar_url}}</code>, <code>{{instructor}}</code>{% endraw %}
+    </p>
+    <input type="text" name="event_reminder_email_subject" class="input mb-2"
+           value="{{ s.event_reminder_email_subject or default_event_reminder_subject }}" placeholder="Asunto"/>
+    <textarea name="event_reminder_email_body" class="input" rows="8">{{ s.event_reminder_email_body or default_event_reminder_body }}</textarea>
 
     <button type="submit" class="btn btn-primary w-full justify-center">Guardar ajustes</button>
   </form>

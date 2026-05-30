@@ -248,6 +248,10 @@ class SiteSettings(db.Model):
     welcome_email_body    = db.Column(db.Text, default='')
     admin_reg_email_subject = db.Column(db.String(300), default='')
     admin_reg_email_body    = db.Column(db.Text, default='')
+    event_reminder_email_subject = db.Column(db.String(300), default='')
+    event_reminder_email_body    = db.Column(db.Text, default='')
+    event_reminder_24h_enabled   = db.Column(db.Boolean, default=True)
+    event_reminder_1h_enabled    = db.Column(db.Boolean, default=True)
 
 
 class PointEvent(db.Model):
