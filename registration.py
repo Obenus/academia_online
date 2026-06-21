@@ -141,7 +141,7 @@ def _sync_user_subscription(user, session_obj, intent, app):
     if cust_id:
         user.stripe_customer_id = cust_id
     if sub_id and app:
-        sync_stripe_subscription(app, user, sub_id)
-    user.subscription_last_paid_at = datetime.utcnow()
-    if user.subscription_status in ('none', ''):
+        sync_stripe_subscription(app, user, sub_id, mark_paid=True)
+    elif user.subscription_status in ('none', ''):
         user.subscription_status = 'active'
+    user.subscription_last_paid_at = datetime.utcnow()

@@ -68,7 +68,14 @@ class User(UserMixin, db.Model):
     def subscription_ok(self):
         if self.is_admin or self.is_free_billing:
             return True
-        return self.subscription_status == 'active'
+        if self.status != 'active':
+            return False
+        st = self.subscription_status or 'none'
+        if st not in ('active', 'trialing'):
+            return False
+        if self.subscription_period_end and self.subscription_period_end < datetime.utcnow():
+            return False
+        return True
 
 
 class SubscriptionPlan(db.Model):

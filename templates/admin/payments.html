@@ -36,7 +36,14 @@
         <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Stripe Webhook Secret</label>
         <input type="password" name="stripe_webhook_secret" class="input" placeholder="{% if has_wh %}Configurado{% else %}whsec_...{% endif %}"/>
         <p class="text-xs mt-1" style="color:var(--text4)">URL webhook en Stripe: <code class="text-xs">{{ webhook_url }}</code></p>
-        <p class="text-xs" style="color:var(--text4)">Eventos: checkout.session.completed, invoice.payment_succeeded, invoice.payment_failed, customer.subscription.updated/deleted</p>
+        <p class="text-xs" style="color:var(--text4)">
+          Suscripción <strong>mensual recurrente sin fecha de fin</strong> (Stripe renueva cada mes hasta cancelación).
+          Eventos obligatorios: <code>checkout.session.completed</code>, <code>invoice.payment_succeeded</code>,
+          <code>invoice.payment_failed</code>, <code>customer.subscription.updated</code>, <code>customer.subscription.deleted</code>.
+        </p>
+        <p class="text-xs mt-1" style="color:var(--text4)">
+          Si un mes no se cobra, el webhook suspende la cuenta automáticamente. El worker <code>billing</code> revisa cada hora periodos vencidos.
+        </p>
       </div>
       <p class="text-sm" style="color:var(--text3)">
         Las plantillas de email (bienvenida y aviso a admins) se configuran en

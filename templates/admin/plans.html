@@ -7,10 +7,15 @@
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3 page-head">
   <div class="admin-page-head mb-0">
     <h1>📋 Planes y precios</h1>
-    <p>Precios España e Internacional por plan</p>
+    <p>Precios España e Internacional por plan — suscripción mensual recurrente (sin fecha de fin en Stripe)</p>
   </div>
   <a href="{{ url_for('admin_payments') }}" class="btn btn-secondary btn-sm">💳 Stripe</a>
 </div>
+
+<p class="text-xs mb-4 px-1" style="color:var(--text4)">
+  En Stripe, cada Price ID debe ser de tipo <strong>recurring / month</strong>. La plataforma registra cada cobro mensual vía webhook
+  (<code>invoice.payment_succeeded</code>) y suspende el acceso si falla (<code>invoice.payment_failed</code>).
+</p>
 
 <div class="rounded-xl p-6 shadow-sm mb-6" style="background:var(--surface);border:1px solid var(--border)">
   <h2 class="text-sm font-bold mb-4" style="color:var(--text1)">Planes actuales</h2>

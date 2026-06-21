@@ -4,6 +4,14 @@ from html import escape
 
 from backup_manager import decrypt_value, encrypt_value
 
+# Estados Stripe que permiten usar la plataforma
+SUBSCRIPTION_ACTIVE_STATUSES = frozenset({'active', 'trialing'})
+
+# Estados que bloquean el acceso (impago, cancelación, etc.)
+SUBSCRIPTION_BLOCK_STATUSES = frozenset({
+    'past_due', 'unpaid', 'canceled', 'incomplete', 'incomplete_expired', 'paused',
+})
+
 
 def get_stripe_secret(app):
     s = _payment_settings(app)
@@ -77,11 +85,11 @@ def default_welcome_body():
 
 
 def default_billing_alert_subject():
-    return 'Alerta suscripción: {{username}} — {{reason}}'
+    return 'Cuenta suspendida por impago: {{username}}'
 
 
 def default_billing_alert_body():
-    return """<p>Se ha producido un evento de suscripción:</p>
+    return """<p>La cuenta de <strong>{{username}}</strong> ha sido <strong>suspendida por impago</strong> y ya no puede acceder a la plataforma.</p>
 <ul>
 <li><strong>Usuario:</strong> {{username}}</li>
 <li><strong>Email:</strong> {{email}}</li>
@@ -89,7 +97,8 @@ def default_billing_alert_body():
 <li><strong>Motivo:</strong> {{reason}}</li>
 <li><strong>Fecha:</strong> {{fecha}}</li>
 </ul>
-<p style="color:#71717a;font-size:12px">Revisa /admin/suscripciones y el grupo WhatsApp VIP si aplica.</p>"""
+<p>La usuaria puede actualizar su método de pago desde Mi cuenta (portal Stripe). Cuando Stripe confirme el cobro, el acceso se reactivará automáticamente.</p>
+<p style="color:#71717a;font-size:12px">Revisa <a href="/admin/suscripciones">Suscripciones</a> y el grupo WhatsApp VIP si aplica.</p>"""
 
 
 def default_admin_reg_subject():
@@ -293,22 +302,55 @@ def mark_whatsapp_vip_pending(user):
     user.whatsapp_vip_pending = True
 
 
+def suspend_user_for_nonpayment(user, reason, *, subscription_status=None,
+                                db=None, notify_fn=None, app=None, mail=None):
+    """
+    Suspende por impago y avisa a administradores (notificación in-app + email).
+    Devuelve True si la cuenta acaba de quedar suspendida en esta llamada.
+    """
+    if user.billing_type == 'free' or user.is_admin:
+        return False
+
+    newly_suspended = user.status != 'suspended'
+    user.status = 'suspended'
+    if subscription_status:
+        user.subscription_status = subscription_status
+    elif user.subscription_status in SUBSCRIPTION_ACTIVE_STATUSES:
+        user.subscription_status = 'past_due'
+    mark_whatsapp_vip_pending(user)
+
+    if newly_suspended:
+        if db is not None and notify_fn is not None:
+            notify_admins_payment_failed(db, notify_fn, user, reason, app=app, mail=mail)
+        elif app and mail:
+            try:
+                sent = send_admin_billing_alert_email(app, mail, user, reason)
+                if not sent:
+                    print(f'[billing] No se envió email de suspensión (SMTP). user={user.username}')
+            except Exception as e:
+                print(f'[billing] admin suspension email: {e}')
+    return newly_suspended
+
+
 def notify_admins_payment_failed(db, notify_fn, user, reason, app=None, mail=None):
     from models import User
-    mark_whatsapp_vip_pending(user)
     admins = User.query.filter_by(role='admin').all()
     for admin in admins:
         notify_fn(
             admin.id,
             'payment_failed',
-            f'⚠️ {user.username} no ha abonado la mensualidad ({reason}). Revisa su cuenta.',
+            f'⚠️ {user.username} suspendida por impago ({reason}). Revisa suscripciones.',
             '/admin/suscripciones',
         )
     if app and mail:
         try:
-            send_admin_billing_alert_email(app, mail, user, reason)
+            sent = send_admin_billing_alert_email(app, mail, user, reason)
+            if not sent:
+                print(f'[billing] No se envió email de suspensión a admins (SMTP no configurado). user={user.username}')
         except Exception as e:
             print(f'[billing] admin alert email: {e}')
+    elif app:
+        print(f'[billing] Email de suspensión omitido: mail no disponible. user={user.username}')
 
 
 def user_payment_label(user):
@@ -317,8 +359,12 @@ def user_payment_label(user):
     st = user.subscription_status or 'none'
     if st == 'active':
         return 'Al día'
+    if st == 'trialing':
+        return 'Periodo de prueba'
     if st == 'past_due':
         return 'Pago pendiente'
+    if st == 'unpaid':
+        return 'Impago'
     if st == 'canceled':
         return 'Cancelado'
     if user.status == 'pending':
@@ -328,8 +374,85 @@ def user_payment_label(user):
     return 'Sin suscripción'
 
 
-def sync_stripe_subscription(app, user, subscription_obj):
-    """Actualiza usuario desde objeto subscription de Stripe (objeto o dict o id str)."""
+def user_needs_paid_subscription(user, payments_on=True):
+    """True si el usuario debe tener suscripción Stripe al día."""
+    if not payments_on:
+        return False
+    if user.is_admin or user.is_free_billing:
+        return False
+    return True
+
+
+def user_platform_access(user, payments_on=True, check_period_end=True):
+    """
+    Devuelve (permitido, mensaje_error).
+    Bloquea cuentas suspendidas, sin suscripción activa o con periodo vencido sin pago.
+    """
+    if user.is_admin:
+        return True, ''
+    if user.is_free_billing:
+        return True, ''
+    if not user_needs_paid_subscription(user, payments_on):
+        if user.status == 'pending':
+            return False, 'Tu cuenta está pendiente de aprobación por un administrador.'
+        if user.status == 'rejected':
+            return False, 'Tu solicitud de acceso ha sido denegada. Contacta con el administrador.'
+        if user.status == 'suspended':
+            return False, 'Tu cuenta está suspendida. Contacta con soporte.'
+        return True, ''
+
+    if user.status == 'pending':
+        return False, 'Tu cuenta está pendiente de aprobación por un administrador.'
+    if user.status == 'rejected':
+        return False, 'Tu solicitud de acceso ha sido denegada. Contacta con el administrador.'
+    if user.status == 'suspended':
+        return False, (
+            'Tu cuenta está suspendida por impago o revisión administrativa. '
+            'Actualiza tu método de pago en Stripe o contacta con soporte.'
+        )
+
+    st = user.subscription_status or 'none'
+    if st not in SUBSCRIPTION_ACTIVE_STATUSES:
+        if st == 'past_due':
+            return False, (
+                'Tu suscripción tiene un pago pendiente. '
+                'Actualiza tu tarjeta desde Mi cuenta para recuperar el acceso.'
+            )
+        if st in ('canceled', 'unpaid'):
+            return False, 'Tu suscripción no está activa. Renueva desde Mi cuenta o contacta con soporte.'
+        if st == 'none':
+            return False, 'No tienes una suscripción activa. Contacta con soporte.'
+        return False, 'Acceso restringido: revisa el estado de tu suscripción en Mi cuenta.'
+
+    if check_period_end and user.subscription_period_end:
+        if user.subscription_period_end < datetime.utcnow():
+            return False, (
+                'Tu mensualidad no se ha renovado. '
+                'Si ya has pagado, espera unos minutos; si no, actualiza tu método de pago en Mi cuenta.'
+            )
+
+    return True, ''
+
+
+def apply_subscription_block(user, subscription_status):
+    """Suspende cuenta de pago si Stripe indica impago o baja (sin notificar; usar suspend_user_for_nonpayment)."""
+    if user.billing_type == 'free' or user.is_admin:
+        return
+    if subscription_status in SUBSCRIPTION_BLOCK_STATUSES:
+        user.status = 'suspended'
+    elif subscription_status in SUBSCRIPTION_ACTIVE_STATUSES:
+        if user.status == 'suspended':
+            user.status = 'active'
+
+
+def _stripe_subscription_period_end(subscription_obj):
+    if isinstance(subscription_obj, dict):
+        return subscription_obj.get('current_period_end')
+    return getattr(subscription_obj, 'current_period_end', None)
+
+
+def sync_stripe_subscription(app, user, subscription_obj, *, mark_paid=False, apply_block=True):
+    """Actualiza usuario desde objeto subscription de Stripe (objeto, dict o id str)."""
     if isinstance(subscription_obj, str):
         import stripe
         stripe.api_key = get_stripe_secret(app)
@@ -337,30 +460,125 @@ def sync_stripe_subscription(app, user, subscription_obj):
     if isinstance(subscription_obj, dict):
         status = subscription_obj.get('status', 'none')
         sub_id = subscription_obj.get('id', '')
-        period_end = subscription_obj.get('current_period_end')
     else:
         status = subscription_obj.status
         sub_id = subscription_obj.id
-        period_end = subscription_obj.current_period_end
     user.stripe_subscription_id = sub_id or user.stripe_subscription_id
     user.subscription_status = status
+    period_end = _stripe_subscription_period_end(subscription_obj)
     if period_end:
         user.subscription_period_end = datetime.utcfromtimestamp(int(period_end))
-    if status == 'active':
+    if mark_paid and status in SUBSCRIPTION_ACTIVE_STATUSES:
         user.subscription_last_paid_at = datetime.utcnow()
+    if apply_block:
+        apply_subscription_block(user, status)
     return status
 
 
-def create_subscription_checkout(
-    app, user, plan, success_url, cancel_url,
-    billing_interval='month', promotion_code=None,
-):
-    import stripe
-    stripe.api_key = get_stripe_secret(app)
-    interval = 'year' if billing_interval == 'year' else 'month'
+def find_user_for_stripe_subscription(db_session, User, sub_id=None, customer_id=None):
+    user = None
+    if sub_id:
+        user = User.query.filter_by(stripe_subscription_id=sub_id).first()
+    if not user and customer_id:
+        user = User.query.filter_by(stripe_customer_id=customer_id).first()
+    return user
+
+
+def process_stripe_webhook_event(app, db, mail, event, notify_fn, *, finalize_registration_fn,
+                                 create_user_from_checkout_fn, get_settings_fn):
+    """Procesa eventos Stripe: renovaciones mensuales, impagos y bajas."""
+    from models import User, SubscriptionPlan
+
+    etype = event['type']
+    data = event['data']['object']
+
+    if etype == 'checkout.session.completed' and data.get('mode') == 'subscription':
+        meta = data.get('metadata') or {}
+        if meta.get('checkout_intent_id') or not meta.get('user_id'):
+            create_user_from_checkout_fn(app, mail, data, get_settings_fn)
+        else:
+            user_id = int(meta.get('user_id', 0) or data.get('client_reference_id', 0) or 0)
+            plan_id = int(meta.get('plan_id', 0) or 0)
+            user = User.query.get(user_id)
+            plan = SubscriptionPlan.query.get(plan_id) if plan_id else None
+            if user:
+                if user.status == 'pending' and finalize_registration_fn:
+                    finalize_registration_fn(user, plan, data)
+                else:
+                    sub_ref = data.get('subscription')
+                    if sub_ref:
+                        sync_stripe_subscription(app, user, sub_ref, mark_paid=True)
+                        db.session.commit()
+        return
+
+    if etype in ('invoice.payment_succeeded', 'invoice.paid'):
+        sub_id = data.get('subscription')
+        if not sub_id:
+            return
+        user = find_user_for_stripe_subscription(db.session, User, sub_id=sub_id, customer_id=data.get('customer'))
+        if not user or user.billing_type == 'free':
+            return
+        user.subscription_last_paid_at = datetime.utcnow()
+        try:
+            sync_stripe_subscription(app, user, sub_id, mark_paid=True)
+        except Exception as e:
+            print(f'[billing] sync on invoice paid: {e}')
+            user.subscription_status = 'active'
+            user.status = 'active'
+            try:
+                period_end = data.get('lines', {}).get('data', [{}])[0].get('period', {}).get('end')
+                if period_end:
+                    user.subscription_period_end = datetime.utcfromtimestamp(int(period_end))
+            except Exception:
+                pass
+        db.session.commit()
+        return
+
+    if etype == 'invoice.payment_failed':
+        sub_id = data.get('subscription')
+        user = find_user_for_stripe_subscription(db.session, User, sub_id=sub_id) if sub_id else None
+        if user and user.billing_type != 'free':
+            suspend_user_for_nonpayment(
+                user, 'pago mensual fallido en Stripe',
+                subscription_status='past_due',
+                db=db, notify_fn=notify_fn, app=app, mail=mail,
+            )
+            db.session.commit()
+        return
+
+    if etype in ('customer.subscription.deleted', 'customer.subscription.updated', 'customer.subscription.created'):
+        sub_id = data.get('id')
+        user = find_user_for_stripe_subscription(db.session, User, sub_id=sub_id, customer_id=data.get('customer'))
+        if not user or user.billing_type == 'free':
+            return
+        sync_stripe_subscription(app, user, data, apply_block=False)
+        status = data.get('status', user.subscription_status)
+        if status in SUBSCRIPTION_BLOCK_STATUSES:
+            reason = {
+                'canceled': 'cancelación de suscripción en Stripe',
+                'unpaid': 'impago tras reintentos de Stripe',
+                'past_due': 'pago mensual pendiente en Stripe',
+            }.get(status, f'estado Stripe: {status}')
+            suspend_user_for_nonpayment(
+                user, reason, subscription_status=status,
+                db=db, notify_fn=notify_fn, app=app, mail=mail,
+            )
+        elif status in SUBSCRIPTION_ACTIVE_STATUSES and user.status == 'suspended':
+            user.status = 'active'
+        db.session.commit()
+
+
+def monthly_subscription_line_item(plan, *, region='es', interval='month'):
+    """Línea de checkout: suscripción recurrente mensual sin fecha de fin."""
+    interval = 'year' if interval == 'year' else 'month'
+    price_id = plan.stripe_price_for_region(region) if region in ('es', 'intl') else ''
+    if interval == 'year':
+        price_id = plan.stripe_price_id_yearly or price_id
+        unit_price = plan.price_yearly or 0
+    else:
+        unit_price = plan.price_for_region(region) if region in ('es', 'intl') else plan.price_monthly
+
     line_item = {'quantity': 1}
-    price_id = plan.stripe_price_id_yearly if interval == 'year' else plan.stripe_price_id
-    unit_price = plan.price_yearly if interval == 'year' else plan.price_monthly
     if price_id:
         line_item['price'] = price_id
     else:
@@ -370,10 +588,30 @@ def create_subscription_checkout(
             'product_data': {'name': plan.name, 'description': (plan.description or '')[:200]},
             'unit_amount': int(round((unit_price or 0) * 100)),
         }
-    sub_data = {'metadata': {'user_id': str(user.id), 'plan_id': str(plan.id)}}
-    trial_days = getattr(plan, 'trial_days', 0) or 0
+    return line_item
+
+
+def monthly_subscription_data(metadata, *, trial_days=0):
+    """Datos de suscripción Stripe: mensual, renovación automática hasta cancelación."""
+    sub_data = {'metadata': metadata}
     if trial_days > 0:
         sub_data['trial_period_days'] = trial_days
+    return sub_data
+
+
+def create_subscription_checkout(
+    app, user, plan, success_url, cancel_url,
+    billing_interval='month', promotion_code=None,
+):
+    import stripe
+    stripe.api_key = get_stripe_secret(app)
+    interval = 'year' if billing_interval == 'year' else 'month'
+    region = 'es'
+    line_item = monthly_subscription_line_item(plan, region=region, interval=interval)
+    sub_data = monthly_subscription_data(
+        {'user_id': str(user.id), 'plan_id': str(plan.id)},
+        trial_days=getattr(plan, 'trial_days', 0) or 0,
+    )
 
     kwargs = dict(
         mode='subscription',
@@ -403,28 +641,15 @@ def create_public_subscription_checkout(app, plan, billing_region, success_url, 
     from models import db, CheckoutIntent
     stripe.api_key = get_stripe_secret(app)
     region = billing_region if billing_region in ('es', 'intl') else 'es'
-    price_id = plan.stripe_price_for_region(region)
-    unit_price = plan.price_for_region(region)
-    line_item = {'quantity': 1}
-    if price_id:
-        line_item['price'] = price_id
-    else:
-        line_item['price_data'] = {
-            'currency': 'eur',
-            'recurring': {'interval': 'month'},
-            'product_data': {'name': plan.name, 'description': (plan.description or '')[:200]},
-            'unit_amount': int(round((unit_price or 0) * 100)),
-        }
-    sub_data = {
-        'metadata': {
+    line_item = monthly_subscription_line_item(plan, region=region, interval='month')
+    sub_data = monthly_subscription_data(
+        {
             'checkout_intent_id': str(checkout_intent_id),
             'plan_id': str(plan.id),
             'billing_region': region,
-        }
-    }
-    trial_days = getattr(plan, 'trial_days', 0) or 0
-    if trial_days > 0:
-        sub_data['trial_period_days'] = trial_days
+        },
+        trial_days=getattr(plan, 'trial_days', 0) or 0,
+    )
 
     session = stripe.checkout.Session.create(
         mode='subscription',

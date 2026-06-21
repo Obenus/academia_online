@@ -164,7 +164,11 @@
 
     <hr style="border-color:var(--border)"/>
     <h3 class="text-sm font-semibold" style="color:var(--text1)">Alertas de facturación (admin)</h3>
-    <p class="text-[11px] mb-2" style="color:var(--text4)">Variables: {% raw %}<code>{{username}}</code>, <code>{{email}}</code>, <code>{{reason}}</code>, <code>{{fecha}}</code>, <code>{{plan_name}}</code>{% endraw %}</p>
+    <p class="text-[11px] mb-2" style="color:var(--text4)">
+      Email automático a administradores cuando una usuaria es <strong>suspendida por impago</strong>
+      (webhook Stripe o revisión horaria del worker <code>billing</code>). Requiere SMTP y <code>ADMIN_EMAIL</code> o admins en BD.
+      Variables: {% raw %}<code>{{username}}</code>, <code>{{email}}</code>, <code>{{reason}}</code>, <code>{{fecha}}</code>, <code>{{plan_name}}</code>{% endraw %}
+    </p>
     <input type="text" name="billing_alert_email_subject" class="input mb-2"
            value="{{ s.billing_alert_email_subject or default_billing_alert_subject }}"/>
     <textarea name="billing_alert_email_body" class="input" rows="6">{{ s.billing_alert_email_body or default_billing_alert_body }}</textarea>

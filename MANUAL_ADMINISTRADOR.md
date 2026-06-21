@@ -77,7 +77,7 @@ Configuración central de la plataforma:
 - **Miembro del mes:** usuario destacado, nota y mes (formato `YYYY-MM`).
 - **Marca:** logo, colores primario/secundario, fuente.
 - **Barra del reproductor:** colores de la barra de controles de vídeo en la Biblioteca (fondo, acento, texto, botones).
-- **Alertas de facturación:** plantilla de email cuando una alumna cancela o entra en impago.
+- **Alertas de facturación:** plantilla de email cuando una alumna es **suspendida por impago** (envío automático a administradores).
 
 Las plantillas de email admiten variables como `{{username}}`, `{{email}}`, `{{plan_name}}`, `{{login_url}}`, etc. (se muestran en cada bloque del formulario).
 
@@ -173,7 +173,25 @@ Desde la página de eventos puedes crear, editar y borrar categorías (nombre, c
 - Crear usuarios manualmente (incluidas cuentas gratuitas).
 - Suspender o eliminar cuentas.
 
-### Suscripciones (`/admin/suscripciones`)
+### Suscripciones mensuales (`/admin/suscripciones`)
+
+La plataforma gestiona **suscripciones mensuales sin fecha de fin** en Stripe. Cada mes Stripe intenta cobrar automáticamente; la plataforma reacciona así:
+
+| Evento | Qué hace la plataforma |
+|--------|------------------------|
+| `invoice.payment_succeeded` | Marca suscripción al día, guarda fecha del último pago y fin del periodo actual |
+| `invoice.payment_failed` | Suspende la cuenta de inmediato y **envía email a administradores** |
+| `customer.subscription.updated` | Sincroniza estado; si hay impago o baja, suspende y **avisa por email** |
+| Worker `billing` (cada hora) | Suspende si el periodo mensual venció sin pago; **email a administradores** |
+
+Los avisos usan la plantilla **Alertas de facturación** en Ajustes y el destino `ADMIN_EMAIL` (o emails de usuarios admin). También se crea una notificación in-app en el panel.
+
+Columnas útiles en el listado:
+
+- **Próx. cobro** — fin del periodo actual (`subscription_period_end`)
+- **Último pago** — última mensualidad confirmada por Stripe
+
+Usuarios suspendidos no pueden entrar ni navegar; pueden acceder a **Mi cuenta** para abrir el portal de Stripe y actualizar la tarjeta.
 
 Vista global del estado de pago:
 
@@ -317,7 +335,9 @@ Suele deberse a migraciones pendientes. Reinicia `app` y revisa logs. Si persist
 
 ### Cuentas suspendidas por impago
 
-El worker `billing` revisa periodos vencidos. Tras regularizar en Stripe, el webhook reactiva; o el admin cambia el estado manualmente.
+El worker `billing` y los webhooks de Stripe suspenden la cuenta. Los administradores reciben un **email automático** (plantilla en Ajustes → Alertas de facturación) y una notificación en el panel.
+
+Tras regularizar en Stripe, el webhook `invoice.payment_succeeded` reactiva el acceso; el admin también puede cambiar el estado manualmente.
 
 ---
 
@@ -328,4 +348,4 @@ El worker `billing` revisa periodos vencidos. Tras regularizar en Stripe, el web
 
 ---
 
-*Versión de plataforma documentada: 2.0.0*
+*Versión de plataforma documentada: 2.1.0*

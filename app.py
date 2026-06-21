@@ -51,6 +51,7 @@ from billing import (
     sync_stripe_subscription, send_welcome_email,
     send_admin_registration_email, notify_admins_payment_failed, user_payment_label,
     mark_whatsapp_vip_pending, video_embed_block,
+    user_platform_access, process_stripe_webhook_event,
 )
 
 app = Flask(__name__)
@@ -104,6 +105,38 @@ def notify(user_id, type_, message, link=''):
     db.session.add(Notification(user_id=user_id, type=type_, message=message, link=link))
 
 _SKIP_PATHS = ('/avatar/', '/curso/', '/comunidad/banner', '/leccion-imagen/', '/static/')
+
+# Rutas accesibles con suscripción suspendida (gestionar pago)
+_SUBSCRIPTION_EXEMPT_ENDPOINTS = frozenset({
+    'login', 'logout', 'stripe_webhook', 'webhook_recording',
+    'checkout_start', 'checkout_success', 'checkout',
+    'account_settings', 'features.billing_portal',
+    'serve_avatar', 'serve_banner', 'serve_course_cover', 'serve_lesson_image',
+    'serve_file',
+})
+
+_SUBSCRIPTION_EXEMPT_PREFIXES = ('/static/', '/webhooks/')
+
+
+@app.before_request
+def enforce_subscription_access():
+    """Bloquea el acceso si la mensualidad no está al día (impago o periodo vencido)."""
+    if not current_user.is_authenticated or current_user.is_admin:
+        return
+    ep = request.endpoint or ''
+    if ep in _SUBSCRIPTION_EXEMPT_ENDPOINTS:
+        return
+    if request.path.startswith(_SUBSCRIPTION_EXEMPT_PREFIXES):
+        return
+    if not payments_enabled(app):
+        return
+    allowed, message = user_platform_access(current_user, payments_on=True)
+    if allowed:
+        return
+    logout_user()
+    flash(message, 'error')
+    return redirect(url_for('login'))
+
 
 @app.before_request
 def update_last_seen():
@@ -328,9 +361,9 @@ def login():
             if getattr(user, 'status', 'active') == 'suspended':
                 flash('Tu cuenta está suspendida por impago o revisión administrativa. Contacta con soporte.', 'error')
                 return render_template('public/conversion_landing.html', **ctx)
-            if (not user.is_admin and not getattr(user, 'is_free_billing', False)
-                    and payments_enabled(app) and getattr(user, 'subscription_status', 'none') == 'past_due'):
-                flash('Tu suscripción tiene un pago pendiente. Contacta con el administrador.', 'error')
+            allowed, msg = user_platform_access(user, payments_on=payments_enabled(app))
+            if not allowed:
+                flash(msg, 'error')
                 return render_template('public/conversion_landing.html', **ctx)
             login_user(user, remember=True)
             return redirect(request.args.get('next') or url_for('start_here'))
@@ -1027,64 +1060,12 @@ def stripe_webhook():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
-    etype = event['type']
-    data = event['data']['object']
-
-    if etype == 'checkout.session.completed' and data.get('mode') == 'subscription':
-        meta = data.get('metadata') or {}
-        if meta.get('checkout_intent_id') or not meta.get('user_id'):
-            create_user_from_checkout(app, mail, data, get_settings)
-        else:
-            user_id = int(meta.get('user_id', 0) or data.get('client_reference_id', 0) or 0)
-            plan_id = int(meta.get('plan_id', 0) or 0)
-            user = User.query.get(user_id)
-            plan = SubscriptionPlan.query.get(plan_id) if plan_id else None
-            if user and user.status == 'pending':
-                _finalize_registration_payment(user, plan, data)
-
-    elif etype in ('invoice.payment_succeeded', 'invoice.paid'):
-        sub_id = data.get('subscription')
-        if sub_id:
-            user = User.query.filter_by(stripe_subscription_id=sub_id).first()
-            if not user:
-                cid = data.get('customer')
-                user = User.query.filter_by(stripe_customer_id=cid).first() if cid else None
-            if user:
-                user.subscription_status = 'active'
-                user.subscription_last_paid_at = datetime.utcnow()
-                if user.status == 'suspended' and user.billing_type != 'free':
-                    user.status = 'active'
-                try:
-                    period_end = data.get('lines', {}).get('data', [{}])[0].get('period', {}).get('end')
-                    if period_end:
-                        user.subscription_period_end = datetime.utcfromtimestamp(period_end)
-                except Exception:
-                    pass
-                db.session.commit()
-
-    elif etype == 'invoice.payment_failed':
-        sub_id = data.get('subscription')
-        user = User.query.filter_by(stripe_subscription_id=sub_id).first() if sub_id else None
-        if user and user.billing_type != 'free':
-            user.subscription_status = 'past_due'
-            user.status = 'suspended'
-            mark_whatsapp_vip_pending(user)
-            db.session.commit()
-            notify_admins_payment_failed(db, notify, user, 'pago fallido', app=app, mail=mail)
-            db.session.commit()
-
-    elif etype in ('customer.subscription.deleted', 'customer.subscription.updated'):
-        sub_id = data.get('id')
-        user = User.query.filter_by(stripe_subscription_id=sub_id).first()
-        if user:
-            sync_stripe_subscription(app, user, data)
-            if data.get('status') in ('canceled', 'unpaid', 'past_due'):
-                if data.get('status') != 'past_due' or user.status == 'active':
-                    user.status = 'suspended'
-                mark_whatsapp_vip_pending(user)
-                reason = 'cancelación' if data.get('status') == 'canceled' else data.get('status', 'actualizado')
-                notify_admins_payment_failed(db, notify, user, reason, app=app, mail=mail)
-            db.session.commit()
+    process_stripe_webhook_event(
+        app, db, mail, event, notify,
+        finalize_registration_fn=_finalize_registration_payment,
+        create_user_from_checkout_fn=create_user_from_checkout,
+        get_settings_fn=get_settings,
+    )
 
     return jsonify({'ok': True}), 200
 

@@ -2,7 +2,7 @@
 
 Plataforma web de academia y comunidad de suscripción construida con **Flask** y **PostgreSQL**. Incluye landing de conversión, biblioteca de vídeo, foro, calendario de encuentros, recursos descargables, panel de administración, pagos por suscripción con **Stripe** (precios España/internacional automáticos), backups automáticos y despliegue con **Docker**.
 
-**Versión actual:** `v2.0.0`
+**Versión actual:** `v2.1.0`
 
 Repositorio: [github.com/Obenus/academia_online](https://github.com/Obenus/academia_online)
 
@@ -68,7 +68,7 @@ Repositorio: [github.com/Obenus/academia_online](https://github.com/Obenus/acade
 | **Calendario** | Eventos en directo, recurrencia, temática mensual |
 | **Cursos (legacy)** | Módulo clásico con progreso por lección |
 | **Usuarios** | Roles, aprobación, cuentas gratuitas |
-| **Suscripciones** | Stripe mensual/anual, control de impagos |
+| **Suscripciones** | Stripe mensual recurrente, control de impagos y **aviso por email a admins al suspender** |
 | **Admin** | Panel completo (ver manual) |
 | **Backups** | pg_dump local + S3 opcional |
 | **PWA** | Instalable en móvil |
@@ -232,6 +232,8 @@ https://TU_DOMINIO/webhooks/stripe
 
 Eventos: `checkout.session.completed`, `invoice.payment_succeeded`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`.
 
+Cuando falla el cobro mensual, la cuenta se suspende y los administradores reciben un email (plantilla en **Ajustes → Alertas de facturación**; destino: `ADMIN_EMAIL`).
+
 ---
 
 ## Servicios en segundo plano
@@ -241,7 +243,7 @@ Eventos: `checkout.session.completed`, `invoice.payment_succeeded`, `invoice.pay
 | `miacademia-app` | Aplicación web (Gunicorn) |
 | `miacademia-db` | PostgreSQL 16 |
 | `miacademia-backup` | Copias de seguridad programadas |
-| `miacademia-billing` | Suspensión por impago |
+| `miacademia-billing` | Suspensión por impago y email automático a administradores |
 | `miacademia-reminder` | Recordatorios de eventos (24 h / 1 h) |
 
 ```bash

@@ -9,6 +9,16 @@
   {% if not current_user.is_admin and not current_user.is_free_billing %}
   <div class="rounded-xl p-4 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
     <h2 class="text-sm font-bold mb-2" style="color:var(--text1)">💳 Suscripción y facturación</h2>
+    {% if current_user.subscription_status == 'active' or current_user.subscription_status == 'trialing' %}
+    <p class="text-xs mb-2" style="color:var(--text3)">
+      Estado: <strong>Al día</strong>
+      {% if current_user.subscription_period_end %} · Próximo cobro: {{ current_user.subscription_period_end.strftime('%d/%m/%Y') }}{% endif %}
+    </p>
+    {% elif current_user.status == 'suspended' or current_user.subscription_status == 'past_due' %}
+    <p class="text-xs mb-3 text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+      Tu suscripción tiene un pago pendiente o la cuenta está suspendida. Actualiza tu método de pago en Stripe para recuperar el acceso.
+    </p>
+    {% endif %}
     <p class="text-xs mb-3" style="color:var(--text3)">Cambia tarjeta, consulta facturas o cancela desde el portal seguro de Stripe.</p>
     <a href="{{ url_for('features.billing_portal') }}" class="btn btn-primary btn-sm">Gestionar suscripción</a>
   </div>

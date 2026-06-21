@@ -23,7 +23,8 @@
           <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Pago</th>
           <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Cuenta</th>
           <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">WhatsApp VIP</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Próx. periodo</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Próx. cobro</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Último pago</th>
           <th class="px-4 py-3 text-right text-xs font-semibold" style="color:var(--text3)">Acciones</th>
         </tr>
       </thead>
@@ -65,6 +66,9 @@
           </td>
           <td class="px-4 py-3 text-xs" style="color:var(--text4)">
             {% if u.subscription_period_end %}{{ u.subscription_period_end.strftime('%d/%m/%Y') }}{% else %}—{% endif %}
+          </td>
+          <td class="px-4 py-3 text-xs" style="color:var(--text4)">
+            {% if u.subscription_last_paid_at %}{{ u.subscription_last_paid_at.strftime('%d/%m/%Y %H:%M') }}{% else %}—{% endif %}
           </td>
           <td class="px-4 py-3">
             <div class="flex flex-wrap gap-1 justify-end">
