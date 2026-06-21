@@ -1,15 +1,14 @@
 {% extends 'base.html' %}
 {% block title %}Usuarios{% endblock %}
-{% block content_class %}max-w-5xl mx-auto{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
 
 {% block content %}
+{% include 'admin/_nav.html' %}
 
-<!-- Header -->
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 page-head">
-  <div class="flex items-center gap-3 flex-wrap">
-    <a href="{{ url_for('admin_dashboard') }}" class="text-sm hover:underline" style="color:var(--text3)">← Admin</a>
-    <span style="color:var(--text4)">/</span>
-    <h1 class="text-xl font-bold" style="color:var(--text1)">👥 Usuarios</h1>
+  <div class="admin-page-head mb-0">
+    <h1>👥 Usuarios</h1>
+    <p>Gestiona roles, estado y acceso</p>
   </div>
   <div class="flex gap-2 page-head-actions w-full sm:w-auto">
     <a href="{{ url_for('admin_plans') }}" class="btn btn-secondary btn-sm">📋 Planes</a>
@@ -300,4 +299,5 @@ document.getElementById('modal-nuevo').addEventListener('click', function(e) {
 });
 </script>
 
+{% include 'admin/_nav_footer.html' %}
 {% endblock %}

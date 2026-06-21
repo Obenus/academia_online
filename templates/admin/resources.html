@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Admin — Recursos{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
+{% block content %}
+{% include 'admin/_nav.html' %}
+<div class="flex items-center justify-between mb-6 page-head">
+  <div class="admin-page-head mb-0">
+    <h1>📎 Recursos</h1>
+    <p>PDFs, audios y materiales descargables</p>
+  </div>
+  <a href="{{ url_for('resources.admin_new') }}" class="btn btn-primary btn-sm">➕ Nuevo</a>
+</div>
+<div class="space-y-3">
+  {% for item in items %}
+  <div class="rounded-xl p-4 flex flex-wrap items-center gap-3 justify-between" style="background:var(--surface);border:1px solid var(--border)">
+    <div>
+      <p class="font-semibold text-sm" style="color:var(--text1)">{{ item.title }}</p>
+      <p class="text-xs mt-0.5" style="color:var(--text4)">{{ item.media_type }} · {% for t in item.tags %}{{ t.name }} {% endfor %}</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="{{ url_for('resources.admin_edit', res_id=item.id) }}" class="btn btn-secondary btn-sm">Editar</a>
+      <form method="POST" action="{{ url_for('resources.admin_delete', res_id=item.id) }}" onsubmit="return confirm('¿Eliminar?')">
+        <button type="submit" class="btn btn-secondary btn-sm" style="color:#ef4444">Borrar</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <p class="text-sm text-center py-8" style="color:var(--text4)">Sin recursos.</p>
+  {% endfor %}
+</div>
+{% include 'admin/_nav_footer.html' %}
+{% endblock %}

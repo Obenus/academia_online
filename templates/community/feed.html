@@ -109,6 +109,11 @@
                 {{ post.category.emoji }} {{ post.category.name }}
               </span>
               {% endif %}
+              {% if post.workflow_status %}
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full workflow-{{ post.workflow_status }}">
+                {% if post.workflow_status=='pendiente' %}Pendiente{% elif post.workflow_status=='respondida' %}Respondida{% elif post.workflow_status=='importante' %}Importante{% else %}Idea contenido{% endif %}
+              </span>
+              {% endif %}
 
               <!-- Admin / owner actions (pin, edit, delete) -->
               <div class="ml-auto flex items-center gap-2">
@@ -302,40 +307,23 @@
       </div>
     </div>
 
-    <!-- Mini leaderboard mensual -->
-    {% if True %}
-    <div class="bg-white border border-[#e4e4e7] rounded-xl overflow-hidden shadow-sm"
+    <!-- Miembro del mes -->
+    {% if member_of_month %}
+    <div class="bg-white border border-[#e4e4e7] rounded-xl overflow-hidden shadow-sm mb-4"
          style="background:var(--surface);border-color:var(--border)">
-      <div class="px-4 pt-4 pb-2 flex items-center justify-between">
-        <p class="text-xs font-bold uppercase tracking-wide" style="color:var(--text3)">🏆 Top del mes</p>
-        <a href="{{ url_for('leaderboard') }}" class="text-[10px] text-violet-500 hover:text-violet-700">Ver todo</a>
+      <div class="px-4 pt-4 pb-2">
+        <p class="text-xs font-bold uppercase tracking-wide" style="color:var(--text3)">⭐ Miembro del mes</p>
       </div>
-      <div class="px-3 pb-3 space-y-1">
-        {% for u, pts in top_month %}
-        {% set pos = loop.index %}
-        <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg"
-             style="background:{% if pos==1 %}rgba(245,158,11,.08){% else %}transparent{% endif %}">
-          <span class="text-sm flex-shrink-0">
-            {% if pos==1 %}🥇{% elif pos==2 %}🥈{% elif pos==3 %}🥉{% else %}<span class="text-xs w-4 text-center" style="color:var(--text4)">{{ pos }}</span>{% endif %}
-          </span>
-          {% if u.avatar_data %}
-          <img src="{{ url_for('serve_avatar', user_id=u.id) }}"
-               class="w-6 h-6 rounded-full object-cover flex-shrink-0"/>
-          {% else %}
-          <div class="w-6 h-6 rounded-full bg-violet-600 flex items-center justify-center
-                      text-white text-[9px] font-bold flex-shrink-0">{{ u.initials }}</div>
-          {% endif %}
-          <span class="text-xs flex-1 truncate font-medium" style="color:var(--text1)">{{ u.username }}</span>
-          <span class="text-xs font-bold text-violet-600 flex-shrink-0">{{ pts }} pts</span>
+      <div class="px-4 pb-4 flex items-center gap-3">
+        <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-violet-600 flex items-center justify-center text-white font-bold">
+          {% if member_of_month.avatar_data %}
+          <img src="{{ url_for('serve_avatar', user_id=member_of_month.id) }}" class="w-full h-full object-cover"/>
+          {% else %}{{ member_of_month.initials }}{% endif %}
         </div>
-        {% else %}
-        <p class="text-xs text-center py-3" style="color:var(--text4)">
-          ¡Completa lecciones y comenta para aparecer aquí!
-        </p>
-        {% endfor %}
-      </div>
-      <div class="px-4 pb-3">
-        <a href="{{ url_for('leaderboard') }}" class="btn btn-secondary w-full justify-center text-xs">Ver clasificación completa</a>
+        <div>
+          <p class="text-sm font-bold" style="color:var(--text1)">{{ member_of_month.username }}</p>
+          {% if member_of_month_note %}<p class="text-xs mt-0.5" style="color:var(--text3)">{{ member_of_month_note }}</p>{% endif %}
+        </div>
       </div>
     </div>
     {% endif %}

@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}Recursos{% endblock %}
+{% block content_class %}max-w-4xl mx-auto{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6 page-head flex-wrap gap-3">
+  <div>
+    <h1 class="text-xl font-bold" style="color:var(--text1)">📎 Recursos</h1>
+    <p class="text-sm mt-0.5" style="color:var(--text4)">PDFs, audios, checklists y más</p>
+  </div>
+  {% if current_user.is_admin %}
+  <a href="{{ url_for('resources.admin_list') }}" class="btn btn-secondary btn-sm">⚙️ Gestionar</a>
+  {% endif %}
+</div>
+
+{% if all_tags %}
+<div class="flex flex-wrap gap-2 mb-5">
+  <a href="{{ url_for('resources.index') }}"
+     class="text-xs px-3 py-1 rounded-full font-semibold transition
+     {% if not active_tag %}bg-violet-600 text-white{% else %}bg-white border border-zinc-200 text-zinc-600{% endif %}">Todos</a>
+  {% for tag in all_tags %}
+  <a href="{{ url_for('resources.index', tag=tag.name) }}"
+     class="text-xs px-3 py-1 rounded-full font-semibold transition
+     {% if active_tag==tag.name %}bg-violet-600 text-white{% else %}bg-white border border-zinc-200 text-zinc-600{% endif %}">{{ tag.name }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="grid sm:grid-cols-2 gap-4">
+  {% for item in items %}
+  <div class="rounded-xl p-4 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+    <div class="flex items-start gap-3">
+      <span class="text-2xl flex-shrink-0">
+        {% if item.media_type=='pdf' %}📄{% elif item.media_type=='audio' %}🎧{% elif item.media_type=='video' %}🎬{% else %}✅{% endif %}
+      </span>
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-sm" style="color:var(--text1)">{{ item.title }}</p>
+        {% if item.description %}
+        <p class="text-xs mt-1" style="color:var(--text3)">{{ item.description[:120] }}{% if item.description|length > 120 %}…{% endif %}</p>
+        {% endif %}
+        {% if item.tags %}
+        <div class="flex flex-wrap gap-1 mt-2">
+          {% for t in item.tags %}
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">{{ t.name }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <a href="{{ url_for('resources.download', res_id=item.id) }}" class="btn btn-primary btn-sm mt-3">Descargar / Abrir</a>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <p class="text-sm col-span-2 text-center py-12" style="color:var(--text4)">No hay recursos{% if active_tag %} con esta etiqueta{% endif %}.</p>
+  {% endfor %}
+</div>
+{% endblock %}

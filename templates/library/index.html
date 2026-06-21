@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}Biblioteca del Círculo{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6 page-head">
+  <div>
+    <h1 class="text-xl font-bold" style="color:var(--text1)">📚 Biblioteca del Círculo</h1>
+    <p class="text-sm mt-0.5" style="color:var(--text4)">Formaciones, encuentros y contenido extra</p>
+  </div>
+  {% if current_user.is_admin %}
+  <a href="{{ url_for('library.admin_list') }}" class="btn btn-secondary btn-sm">⚙️ Gestionar</a>
+  {% endif %}
+</div>
+
+{% if cards %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+  {% for card in cards %}
+  <a href="{{ url_for('library.course_view', slug=card.slug) }}"
+     class="block rounded-2xl overflow-hidden shadow-sm border transition-all hover:shadow-lg hover:-translate-y-0.5"
+     style="background:var(--surface);border-color:var(--border);text-decoration:none">
+
+    <div class="w-full aspect-[16/9] overflow-hidden flex items-center justify-center relative"
+         style="background:#1a1a1a">
+      {% if card.course and card.course.cover_data %}
+      <img src="{{ url_for('serve_course_cover', course_id=card.course.id) }}" alt="{{ card.title }}"
+           class="w-full h-full object-cover"/>
+      {% elif card.kind == 'encuentros' %}
+      <div class="w-full h-full flex items-center justify-center"
+           style="background:linear-gradient(135deg,#7c3aed,#6d28d9)">
+        <span class="text-6xl">🎥</span>
+      </div>
+      {% else %}
+      <span class="text-7xl opacity-25">📚</span>
+      {% endif %}
+      <div class="absolute top-3 left-3">
+        <span class="text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wide shadow text-white"
+              style="background:{% if card.kind=='encuentros' %}#dc2626{% else %}#7c3aed{% endif %}">
+          {% if card.kind=='encuentros' %}Encuentro{% else %}Formación{% endif %}
+        </span>
+      </div>
+    </div>
+
+    <div class="p-5">
+      <h2 class="font-bold text-base leading-snug mb-1" style="color:var(--text1)">{{ card.title }}</h2>
+      {% if card.subtitle %}
+      <p class="text-sm leading-relaxed line-clamp-2 mb-3" style="color:var(--text3)">{{ card.subtitle }}</p>
+      {% endif %}
+      <p class="text-xs font-semibold" style="color:var(--text4)">{{ card.count }} vídeo{{ 's' if card.count != 1 else '' }}</p>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-16 rounded-xl" style="background:var(--surface);border:1px solid var(--border)">
+  <p class="text-4xl mb-2">📚</p>
+  <p class="text-sm" style="color:var(--text4)">Aún no hay contenido en la biblioteca.</p>
+</div>
+{% endif %}
+{% endblock %}

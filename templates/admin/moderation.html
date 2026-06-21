@@ -1,28 +1,34 @@
 {% extends 'base.html' %}
 {% block title %}Moderación{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
 {% block content %}
-<div class="max-w-3xl mx-auto">
-  <a href="{{ url_for('admin_dashboard') }}" class="text-sm" style="color:var(--text3)">← Admin</a>
-  <h1 class="text-xl font-bold my-4" style="color:var(--text1)">🛡 Moderación</h1>
-  <h2 class="text-sm font-bold mb-3">Reportes pendientes</h2>
-  {% for r in reports %}
-  <div class="rounded-xl p-4 mb-3" style="background:var(--surface);border:1px solid var(--border)">
-    <p class="text-sm font-semibold">{{ r.post.title }}</p>
-    <p class="text-xs mt-1" style="color:var(--text3)">Por {{ r.reporter.username }} — {{ r.reason }}</p>
-    <form method="POST" action="{{ url_for('features.admin_resolve_report', report_id=r.id) }}" class="flex flex-wrap gap-2 mt-3">
-      <button name="action" value="hide" type="submit" class="btn btn-secondary btn-sm">Ocultar post</button>
-      <button name="action" value="dismiss" type="submit" class="btn btn-secondary btn-sm">Descartar</button>
-      <a href="{{ url_for('post_detail', post_id=r.post_id) }}" class="btn btn-secondary btn-sm">Ver post</a>
-    </form>
-  </div>
-  {% else %}
-  <p class="text-sm" style="color:var(--text4)">No hay reportes pendientes.</p>
-  {% endfor %}
-  <h2 class="text-sm font-bold mt-8 mb-3">Posts ocultos recientes</h2>
-  {% for p in hidden_posts %}
-  <div class="text-sm py-2 border-b" style="border-color:var(--border)">{{ p.title }} — {{ p.hidden_reason }}</div>
-  {% else %}
-  <p class="text-sm" style="color:var(--text4)">Ninguno.</p>
-  {% endfor %}
+{% include 'admin/_nav.html' %}
+<div class="admin-page-head">
+  <h1>🛡 Moderación</h1>
+  <p>Reportes de la comunidad y posts ocultos</p>
 </div>
+
+<h2 class="text-sm font-bold mb-3" style="color:var(--text1)">Reportes pendientes</h2>
+{% for r in reports %}
+<div class="rounded-xl p-4 mb-3" style="background:var(--surface);border:1px solid var(--border)">
+  <p class="text-sm font-semibold">{{ r.post.title }}</p>
+  <p class="text-xs mt-1" style="color:var(--text3)">Por {{ r.reporter.username }} — {{ r.reason }}</p>
+  <form method="POST" action="{{ url_for('features.admin_resolve_report', report_id=r.id) }}" class="flex flex-wrap gap-2 mt-3">
+    <button name="action" value="hide" type="submit" class="btn btn-secondary btn-sm">Ocultar post</button>
+    <button name="action" value="dismiss" type="submit" class="btn btn-secondary btn-sm">Descartar</button>
+    <a href="{{ url_for('post_detail', post_id=r.post_id) }}" class="btn btn-secondary btn-sm">Ver post</a>
+  </form>
+</div>
+{% else %}
+<p class="text-sm mb-6" style="color:var(--text4)">No hay reportes pendientes.</p>
+{% endfor %}
+
+<h2 class="text-sm font-bold mt-8 mb-3" style="color:var(--text1)">Posts ocultos recientes</h2>
+{% for p in hidden_posts %}
+<div class="text-sm py-2 border-b" style="border-color:var(--border);color:var(--text2)">{{ p.title }} — {{ p.hidden_reason }}</div>
+{% else %}
+<p class="text-sm" style="color:var(--text4)">Ninguno.</p>
+{% endfor %}
+
+{% include 'admin/_nav_footer.html' %}
 {% endblock %}

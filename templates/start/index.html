@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Empieza por aquí{% endblock %}
+{% block content_class %}max-w-3xl mx-auto{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold" style="color:var(--text1)">🌸 Empieza por aquí</h1>
+  {% if site.start_page_intro %}
+  <p class="text-sm mt-2" style="color:var(--text2)">{{ site.start_page_intro }}</p>
+  {% else %}
+  <p class="text-sm mt-2" style="color:var(--text2)">Bienvenida a la comunidad. Mira estos vídeos y conéctate con el grupo.</p>
+  {% endif %}
+</div>
+
+{% if site.welcome_video_url %}
+<div class="rounded-xl overflow-hidden mb-6 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+  <div class="px-4 py-3 border-b" style="border-color:var(--border)">
+    <h2 class="text-sm font-bold" style="color:var(--text1)">Vídeo de bienvenida</h2>
+  </div>
+  <div class="aspect-video bg-black">
+    {{ video_embed_block(site.welcome_video_url)|safe }}
+  </div>
+</div>
+{% endif %}
+
+{% if site.how_it_works_video_url %}
+<div class="rounded-xl overflow-hidden mb-6 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+  <div class="px-4 py-3 border-b" style="border-color:var(--border)">
+    <h2 class="text-sm font-bold" style="color:var(--text1)">Cómo funciona la comunidad</h2>
+  </div>
+  <div class="aspect-video bg-black">
+    {{ video_embed_block(site.how_it_works_video_url)|safe }}
+  </div>
+</div>
+{% endif %}
+
+<div class="grid sm:grid-cols-2 gap-4">
+  {% if site.whatsapp_url %}
+  <a href="{{ site.whatsapp_url }}" target="_blank" rel="noopener"
+     class="btn btn-primary justify-center py-4 text-base">💬 Unirme al grupo de WhatsApp</a>
+  {% endif %}
+  <a href="{{ url_for('community') }}" class="btn btn-secondary justify-center py-4 text-base">💬 Ir a la comunidad</a>
+</div>
+
+<div class="mt-6 p-4 rounded-xl text-sm" style="background:#fef3c7;border:1px solid #fde68a;color:#92400e">
+  <strong>Consejo:</strong> Si recibiste tu contraseña por email, cámbiala en
+  <a href="{{ url_for('account_settings') }}" class="underline font-semibold">Mi cuenta</a> cuando puedas.
+</div>
+{% endblock %}

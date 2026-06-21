@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Editar' if item else 'Nuevo' }} — Biblioteca{% endblock %}
+{% block content_class %}max-w-lg mx-auto{% endblock %}
+{% block content %}
+<a href="{{ url_for('library.admin_list') }}" class="text-sm" style="color:var(--text3)">← Biblioteca</a>
+<h1 class="text-xl font-bold my-4" style="color:var(--text1)">{{ 'Editar elemento' if item else 'Nuevo elemento' }}</h1>
+<form method="POST" class="rounded-xl p-6 space-y-4 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">Título *</label>
+    <input type="text" name="title" class="input" value="{{ item.title if item else '' }}" required/></div>
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">Descripción</label>
+    <textarea name="description" class="input" rows="3">{{ item.description if item else '' }}</textarea></div>
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">URL del vídeo</label>
+    <input type="url" name="video_url" class="input" value="{{ item.video_url if item else '' }}" placeholder="https://vimeo.com/..."/></div>
+  <div class="grid grid-cols-2 gap-3">
+    <div><label class="block text-xs mb-1" style="color:var(--text3)">Año</label>
+      <input type="number" name="year" class="input" value="{{ item.year if item else 2026 }}" min="2020" max="2035"/></div>
+    <div><label class="block text-xs mb-1" style="color:var(--text3)">Mes</label>
+      <select name="month" class="input">
+        {% for i in range(1,13) %}
+        <option value="{{ i }}" {% if item and item.month==i %}selected{% elif not item and i==1 %}selected{% endif %}>{{ month_names[i] }}</option>
+        {% endfor %}
+      </select></div>
+  </div>
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">Tipo</label>
+    <select name="item_type" class="input">
+      <option value="encuentro" {% if item and item.item_type=='encuentro' %}selected{% endif %}>Encuentro</option>
+      <option value="extra" {% if not item or item.item_type=='extra' %}selected{% endif %}>Extra</option>
+    </select></div>
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">Clase en vivo vinculada (opcional)</label>
+    <select name="live_class_id" class="input">
+      <option value="">— Ninguna —</option>
+      {% for c in classes %}
+      <option value="{{ c.id }}" {% if item and item.live_class_id==c.id %}selected{% endif %}>{{ c.title }} ({{ c.scheduled_at.strftime('%d/%m/%Y') }})</option>
+      {% endfor %}
+    </select></div>
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">Orden</label>
+    <input type="number" name="sort_order" class="input" value="{{ item.sort_order if item else 0 }}"/></div>
+  <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_published" {% if not item or item.is_published %}checked{% endif %}/> Publicado</label>
+  <button type="submit" class="btn btn-primary w-full justify-center">Guardar</button>
+</form>
+{% endblock %}

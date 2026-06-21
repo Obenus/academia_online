@@ -36,6 +36,7 @@ class User(UserMixin, db.Model):
     subscription_status    = db.Column(db.String(30), default='none')  # none|active|past_due|canceled|unpaid
     subscription_period_end = db.Column(db.DateTime, nullable=True)
     subscription_last_paid_at = db.Column(db.DateTime, nullable=True)
+    whatsapp_vip_pending    = db.Column(db.Boolean, default=False)
 
     posts        = db.relationship('Post',    backref='author', lazy=True)
     subscription_plan = db.relationship('SubscriptionPlan', backref='users', lazy=True)
@@ -75,8 +76,12 @@ class SubscriptionPlan(db.Model):
     name            = db.Column(db.String(120), nullable=False)
     description     = db.Column(db.Text, default='')
     price_monthly   = db.Column(db.Float, default=0.0)
+    price_monthly_es = db.Column(db.Float, default=0.0)
+    price_monthly_intl = db.Column(db.Float, default=0.0)
     price_yearly    = db.Column(db.Float, default=0.0)
     stripe_price_id = db.Column(db.String(120), default='')
+    stripe_price_id_es = db.Column(db.String(120), default='')
+    stripe_price_id_intl = db.Column(db.String(120), default='')
     stripe_price_id_yearly = db.Column(db.String(120), default='')
     trial_days      = db.Column(db.Integer, default=0)
     stripe_coupon_id = db.Column(db.String(120), default='')
@@ -84,10 +89,38 @@ class SubscriptionPlan(db.Model):
     sort_order      = db.Column(db.Integer, default=0)
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
 
+    def price_for_region(self, region='es'):
+        if region == 'intl':
+            return self.price_monthly_intl or self.price_monthly or 0.0
+        return self.price_monthly_es or self.price_monthly or 0.0
+
+    def stripe_price_for_region(self, region='es'):
+        if region == 'intl':
+            return self.stripe_price_id_intl or self.stripe_price_id or ''
+        return self.stripe_price_id_es or self.stripe_price_id or ''
+
+
+class CheckoutIntent(db.Model):
+    __tablename__ = 'checkout_intent'
+    id                 = db.Column(db.Integer, primary_key=True)
+    stripe_session_id  = db.Column(db.String(200), unique=True, nullable=True)
+    plan_id            = db.Column(db.Integer, db.ForeignKey('subscription_plan.id'), nullable=False)
+    billing_region     = db.Column(db.String(10), default='es')  # es | intl
+    customer_email     = db.Column(db.String(120), default='')
+    customer_name      = db.Column(db.String(200), default='')
+    status             = db.Column(db.String(20), default='pending')  # pending|completed|failed
+    user_id            = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    plain_password     = db.Column(db.String(80), default='')  # one-time for welcome email
+    created_at         = db.Column(db.DateTime, default=datetime.utcnow)
+    plan               = db.relationship('SubscriptionPlan', backref='checkout_intents', lazy=True)
+    user               = db.relationship('User', backref='checkout_intents', lazy=True)
+
 
 class Category(db.Model):
     id    = db.Column(db.Integer, primary_key=True)
     name  = db.Column(db.String(50), unique=True, nullable=False)
+    slug  = db.Column(db.String(50), unique=True, nullable=True)
+    is_system = db.Column(db.Boolean, default=False)
     color = db.Column(db.String(20), default='#6366f1')
     emoji = db.Column(db.String(10), default='💬')
     required_plan_id = db.Column(db.Integer, db.ForeignKey('subscription_plan.id'), nullable=True)
@@ -105,6 +138,7 @@ class Post(db.Model):
     pinned      = db.Column(db.Boolean, default=False)
     is_hidden   = db.Column(db.Boolean, default=False)
     hidden_reason = db.Column(db.String(300), default='')
+    workflow_status = db.Column(db.String(30), nullable=True)  # pendiente|respondida|importante|idea_contenido
 
     likes    = db.relationship('User', secondary=post_likes,
                                backref=db.backref('liked_posts', lazy=True))
@@ -252,6 +286,38 @@ class SiteSettings(db.Model):
     event_reminder_email_body    = db.Column(db.Text, default='')
     event_reminder_24h_enabled   = db.Column(db.Boolean, default=True)
     event_reminder_1h_enabled    = db.Column(db.Boolean, default=True)
+    billing_alert_email_subject  = db.Column(db.String(300), default='')
+    billing_alert_email_body     = db.Column(db.Text, default='')
+    landing_title                = db.Column(db.String(200), default='')
+    landing_subtitle             = db.Column(db.Text, default='')
+    landing_benefits             = db.Column(db.Text, default='')
+    landing_hook                 = db.Column(db.Text, default='')
+    landing_intro                = db.Column(db.Text, default='')
+    landing_what_is              = db.Column(db.Text, default='')
+    landing_how_helps            = db.Column(db.Text, default='')
+    landing_explore_questions    = db.Column(db.Text, default='')
+    landing_includes             = db.Column(db.Text, default='')
+    landing_for_you              = db.Column(db.Text, default='')
+    landing_closing              = db.Column(db.Text, default='')
+    landing_cta_text             = db.Column(db.String(120), default='')
+    landing_price_note           = db.Column(db.String(200), default='')
+    landing_login_title          = db.Column(db.String(200), default='')
+    landing_login_subtitle       = db.Column(db.String(300), default='')
+    welcome_video_url            = db.Column(db.String(500), default='')
+    how_it_works_video_url       = db.Column(db.String(500), default='')
+    start_page_intro             = db.Column(db.Text, default='')
+    whatsapp_url                 = db.Column(db.String(500), default='')
+    brand_logo_url               = db.Column(db.String(500), default='')
+    color_primary                = db.Column(db.String(20), default='#7c3aed')
+    color_secondary              = db.Column(db.String(20), default='#6d28d9')
+    font_family                  = db.Column(db.String(120), default='')
+    player_bar_bg                = db.Column(db.String(20), default='#141414')
+    player_bar_accent            = db.Column(db.String(20), default='')
+    player_bar_text              = db.Column(db.String(20), default='#bfbfbf')
+    player_bar_btn               = db.Column(db.String(20), default='#2a2a2a')
+    member_of_month_user_id      = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    member_of_month_note         = db.Column(db.String(300), default='')
+    member_of_month_month        = db.Column(db.String(20), default='')  # YYYY-MM
 
 
 class PointEvent(db.Model):
@@ -294,6 +360,58 @@ class LiveClass(db.Model):
     recurrence   = db.Column(db.String(10), default='none')  # 'none' | 'weekly' | 'monthly'
     parent_id    = db.Column(db.Integer, db.ForeignKey('live_class.id'), nullable=True)
     category_id  = db.Column(db.Integer, db.ForeignKey('live_class_category.id'), nullable=True)
+    subtopic     = db.Column(db.String(200), default='')
+
+
+class CalendarMonthTheme(db.Model):
+    __tablename__ = 'calendar_month_theme'
+    id          = db.Column(db.Integer, primary_key=True)
+    year        = db.Column(db.Integer, nullable=False)
+    month       = db.Column(db.Integer, nullable=False)
+    theme_title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+
+
+class LibraryItem(db.Model):
+    __tablename__ = 'library_item'
+    id            = db.Column(db.Integer, primary_key=True)
+    title         = db.Column(db.String(200), nullable=False)
+    description   = db.Column(db.Text, default='')
+    video_url     = db.Column(db.String(500), default='')
+    year          = db.Column(db.Integer, nullable=False)
+    month         = db.Column(db.Integer, nullable=False)
+    item_type     = db.Column(db.String(20), default='extra')  # encuentro|extra
+    live_class_id = db.Column(db.Integer, db.ForeignKey('live_class.id'), nullable=True)
+    sort_order    = db.Column(db.Integer, default=0)
+    is_published  = db.Column(db.Boolean, default=True)
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+    live_class    = db.relationship('LiveClass', backref='library_items', lazy=True)
+
+
+resource_tags = db.Table('resource_tags',
+    db.Column('resource_id', db.Integer, db.ForeignKey('resource.id'), primary_key=True),
+    db.Column('tag_id', db.Integer, db.ForeignKey('resource_tag.id'), primary_key=True),
+)
+
+
+class ResourceTag(db.Model):
+    __tablename__ = 'resource_tag'
+    id   = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), unique=True, nullable=False)
+
+
+class Resource(db.Model):
+    __tablename__ = 'resource'
+    id          = db.Column(db.Integer, primary_key=True)
+    title       = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+    media_type  = db.Column(db.String(20), default='pdf')  # pdf|audio|video|checklist
+    file_url    = db.Column(db.String(500), default='')
+    file_data   = db.Column(db.LargeBinary, nullable=True)
+    file_mime   = db.Column(db.String(100), default='')
+    file_name   = db.Column(db.String(200), default='')
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    tags        = db.relationship('ResourceTag', secondary=resource_tags, backref='resources', lazy=True)
 
 
 class Quiz(db.Model):

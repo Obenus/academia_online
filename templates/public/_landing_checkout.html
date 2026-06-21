@@ -1,0 +1,37 @@
+{# Tarjeta de planes + Stripe — región detectada automáticamente (region, region_label) #}
+<div class="conv-card" id="planes">
+  <h2 class="conv-card-title">Elige tu plan</h2>
+  {% if region == 'intl' %}
+  <p class="text-center text-xs mb-4 opacity-60">Precio internacional</p>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('checkout_start') }}" id="checkout-form">
+    {% include 'includes/csrf_field.html' %}
+
+    <div class="space-y-3 mb-5">
+      {% for plan in plans %}
+      <label class="conv-plan block cursor-pointer {% if loop.first %}conv-plan-on{% endif %}" data-plan-id="{{ plan.id }}">
+        <input type="radio" name="plan_id" value="{{ plan.id }}" class="sr-only plan-radio" {% if loop.first %}checked{% endif %}/>
+        <p class="font-bold text-base">{{ plan.name }}</p>
+        {% if plan.description %}
+        <p class="text-sm opacity-75 mt-0.5">{{ plan.description }}</p>
+        {% endif %}
+        <p class="text-2xl font-bold mt-2 conv-accent">
+          {{ '%.2f'|format(plan.price_for_region(region)) }} €
+          <span class="text-sm font-normal opacity-70">/mes</span>
+        </p>
+      </label>
+      {% else %}
+      <p class="text-sm text-center opacity-70">No hay planes disponibles.</p>
+      {% endfor %}
+    </div>
+
+    {% if plans and stripe_pk %}
+    <button type="submit" class="conv-btn w-full">{{ landing_text(site, 'landing_cta_text') }}</button>
+    <p class="text-center text-xs mt-3 opacity-60">{{ landing_text(site, 'landing_price_note') }}</p>
+    {% elif plans %}
+    <p class="text-sm text-center text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">Pagos no configurados. Contacta con soporte.</p>
+    {% endif %}
+  </form>
+  <p class="text-center text-[11px] mt-4 opacity-50">Pago seguro con Stripe</p>
+</div>

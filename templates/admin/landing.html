@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}Landing principal{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
+
+{% block content %}
+{% include 'admin/_nav.html' %}
+<div class="admin-page-head flex flex-wrap items-start justify-between gap-3">
+  <div>
+    <h1>🌸 Landing principal</h1>
+    <p>Textos de la página de acceso y suscripción (<code>/login</code>)</p>
+  </div>
+  <a href="{{ url_for('login') }}" target="_blank" rel="noopener"
+     class="text-sm font-semibold text-violet-600 hover:text-violet-800">Ver landing →</a>
+</div>
+
+<div class="rounded-xl p-6 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+  <form method="POST" class="space-y-5">
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Nombre / titular (cabecera)</label>
+      <input type="text" name="landing_title" class="input" value="{{ s.landing_title or defaults.landing_title }}"/>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Apertura — preguntas y «No estás perdida»</label>
+      <textarea name="landing_hook" class="input" rows="14">{{ s.landing_hook or defaults.landing_hook }}</textarea>
+      <p class="text-[11px] mt-1" style="color:var(--text4)">Párrafos separados por una línea en blanco.</p>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Por qué nació (mejores preguntas)</label>
+      <textarea name="landing_intro" class="input" rows="6">{{ s.landing_intro or defaults.landing_intro }}</textarea>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">¿Qué es? (no es terapia, es un círculo…)</label>
+      <textarea name="landing_what_is" class="input" rows="8">{{ s.landing_what_is or defaults.landing_what_is }}</textarea>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">¿Cómo puede ayudarte?</label>
+      <textarea name="landing_how_helps" class="input" rows="7">{{ s.landing_how_helps or defaults.landing_how_helps }}</textarea>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Preguntas que exploraremos (una por línea)</label>
+      <textarea name="landing_explore_questions" class="input" rows="7">{{ s.landing_explore_questions or defaults.landing_explore_questions }}</textarea>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">¿Qué encontrarás dentro? (una por línea)</label>
+      <textarea name="landing_includes" class="input" rows="7">{{ s.landing_includes or defaults.landing_includes }}</textarea>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Este círculo es para ti si… (una por línea)</label>
+      <textarea name="landing_for_you" class="input" rows="7">{{ s.landing_for_you or defaults.landing_for_you }}</textarea>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Cierre emocional</label>
+      <textarea name="landing_closing" class="input" rows="5">{{ s.landing_closing or defaults.landing_closing }}</textarea>
+      <p class="text-[11px] mt-1" style="color:var(--text4)">Dos bloques separados por línea en blanco: mensaje + «Tu ratito…»</p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto del botón de suscripción</label>
+        <input type="text" name="landing_cta_text" class="input" value="{{ s.landing_cta_text or defaults.landing_cta_text }}"/>
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Nota bajo el precio</label>
+        <input type="text" name="landing_price_note" class="input" value="{{ s.landing_price_note or defaults.landing_price_note }}"/>
+      </div>
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Título bloque login</label>
+        <input type="text" name="landing_login_title" class="input" value="{{ s.landing_login_title or defaults.landing_login_title }}"/>
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Subtítulo login</label>
+        <input type="text" name="landing_login_subtitle" class="input" value="{{ s.landing_login_subtitle or defaults.landing_login_subtitle }}"/>
+      </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row gap-3 pt-2">
+      <button type="submit" class="btn btn-primary flex-1 justify-center">Guardar landing</button>
+      <button type="submit" name="action" value="reset"
+              class="btn btn-secondary flex-1 justify-center"
+              onclick="return confirm('¿Restaurar todos los textos al contenido original del PDF?')">
+        Restaurar textos del PDF
+      </button>
+    </div>
+  </form>
+</div>
+{% include 'admin/_nav_footer.html' %}
+{% endblock %}

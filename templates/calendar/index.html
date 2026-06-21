@@ -30,9 +30,17 @@
   <div>
     <h1 class="text-xl font-bold text-[#18181b]">📅 Calendario</h1>
     <p class="text-sm text-[#71717a] mt-0.5">Eventos, encuentros y actividades programadas</p>
+    {% if month_theme %}
+    <div class="mt-3 p-3 rounded-xl" style="background:linear-gradient(90deg,#7c3aed22,#6d28d922);border:1px solid #7c3aed44">
+      <p class="text-xs font-bold uppercase tracking-wide text-violet-700">Temática del mes</p>
+      <p class="font-bold text-sm mt-0.5" style="color:var(--text1)">{{ month_theme.theme_title }}</p>
+      {% if month_theme.description %}<p class="text-xs mt-1" style="color:var(--text3)">{{ month_theme.description }}</p>{% endif %}
+    </div>
+    {% endif %}
   </div>
   {% if current_user.is_admin %}
   <div class="flex gap-2 flex-wrap page-head-actions">
+    <a href="{{ url_for('admin_calendar_theme') }}" class="btn btn-secondary btn-sm">🎨 Temática mensual</a>
     <a href="{{ url_for('admin_live_classes') }}" class="btn btn-secondary btn-sm">⚙️ Categorías y eventos</a>
     <a href="{{ url_for('admin_new_live_class') }}" class="btn btn-primary btn-sm">➕ Nuevo evento</a>
   </div>
@@ -73,6 +81,7 @@
                 style="color:{{ lc.category.color }}">{{ lc.category.emoji }} {{ lc.category.name }}</span>
           {% endif %}
           <p class="font-semibold text-sm mt-1" style="color:#18181b">{{ lc.title }}</p>
+          {% if lc.subtopic %}<p class="text-xs font-medium mt-0.5" style="color:var(--text3)">✨ {{ lc.subtopic }}</p>{% endif %}
           <p class="text-xs font-medium mt-0.5" style="color:var(--text3)">
             📅 {{ lc.scheduled_at.strftime('%d %b · %H:%M') }}
           </p>
@@ -151,7 +160,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (p.duration) { durEl.textContent = '⏱ ' + p.duration + ' minutos'; durEl.classList.remove('hidden'); }
         else durEl.classList.add('hidden');
         const descEl = document.getElementById('modal-desc');
-        if (p.description) { descEl.textContent = p.description; descEl.classList.remove('hidden'); }
+        let desc = p.description || '';
+        if (p.subtopic) desc = '✨ ' + p.subtopic + (desc ? '\n\n' + desc : '');
+        if (desc) { descEl.textContent = desc; descEl.classList.remove('hidden'); }
         else descEl.classList.add('hidden');
         const linkEl = document.getElementById('modal-link');
         if (p.meet_url) { linkEl.href = p.meet_url; linkEl.classList.remove('hidden'); }

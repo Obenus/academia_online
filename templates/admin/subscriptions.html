@@ -3,12 +3,13 @@
 {% block content_class %}max-w-6xl mx-auto{% endblock %}
 
 {% block content %}
+{% include 'admin/_nav.html' %}
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3 page-head">
-  <div class="flex items-center gap-3">
-    <a href="{{ url_for('admin_payments') }}" class="text-sm" style="color:var(--text3)">← Pagos</a>
-    <h1 class="text-xl font-bold" style="color:var(--text1)">📊 Suscripciones y pagos</h1>
+  <div class="admin-page-head mb-0">
+    <h1>📊 Suscripciones</h1>
+    <p>Estado de pago, planes y WhatsApp VIP</p>
   </div>
-  <a href="{{ url_for('admin_users') }}" class="btn btn-secondary btn-sm">Gestionar usuarios</a>
+  <a href="{{ url_for('admin_users') }}" class="btn btn-secondary btn-sm">👥 Usuarios</a>
 </div>
 
 <div class="rounded-xl overflow-hidden shadow-sm table-scroll" style="background:var(--surface);border:1px solid var(--border)">
@@ -21,6 +22,7 @@
           <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Plan</th>
           <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Pago</th>
           <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Cuenta</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">WhatsApp VIP</th>
           <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Próx. periodo</th>
           <th class="px-4 py-3 text-right text-xs font-semibold" style="color:var(--text3)">Acciones</th>
         </tr>
@@ -53,6 +55,14 @@
             </span>
           </td>
           <td class="px-4 py-3 text-xs">{{ u.status }}</td>
+          <td class="px-4 py-3 text-xs">
+            {% if u.whatsapp_vip_pending %}
+            <span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-800">Pendiente</span>
+            <form method="POST" action="{{ url_for('admin_clear_whatsapp_vip', user_id=u.id) }}" class="inline mt-1">
+              <button type="submit" class="text-[10px] text-violet-600 font-semibold">Marcado ✓</button>
+            </form>
+            {% else %}—{% endif %}
+          </td>
           <td class="px-4 py-3 text-xs" style="color:var(--text4)">
             {% if u.subscription_period_end %}{{ u.subscription_period_end.strftime('%d/%m/%Y') }}{% else %}—{% endif %}
           </td>
@@ -80,4 +90,5 @@
     </table>
   </div>
 </div>
+{% include 'admin/_nav_footer.html' %}
 {% endblock %}

@@ -1,14 +1,15 @@
 {% extends 'base.html' %}
 {% block title %}Calendario — Admin{% endblock %}
-{% block content_class %}max-w-4xl mx-auto{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
 
 {% block content %}
+{% include 'admin/_nav.html' %}
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3 page-head">
-  <div>
-    <a href="{{ url_for('calendar') }}" class="text-sm text-[#71717a] hover:underline">← Calendario</a>
-    <h1 class="text-xl font-bold text-[#18181b] mt-1">📅 Gestión del calendario</h1>
+  <div class="admin-page-head mb-0">
+    <h1>📅 Gestión del calendario</h1>
+    <p>Categorías y eventos programados</p>
   </div>
-  <a href="{{ url_for('admin_new_live_class') }}" class="btn btn-primary">➕ Nuevo evento</a>
+  <a href="{{ url_for('admin_new_live_class') }}" class="btn btn-primary btn-sm">➕ Nuevo evento</a>
 </div>
 
 <div class="bg-white border border-[#e4e4e7] rounded-xl p-5 shadow-sm mb-6">
@@ -69,4 +70,5 @@
   <p class="text-[#71717a]">No hay eventos programados.</p>
 </div>
 {% endif %}
+{% include 'admin/_nav_footer.html' %}
 {% endblock %}

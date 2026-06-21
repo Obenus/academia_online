@@ -1,0 +1,98 @@
+{# Navegación lateral del panel admin — incluir con: {% include 'admin/_nav.html' %} #}
+{% set ep = request.endpoint or '' %}
+
+<style>
+  .admin-shell { display:grid; gap:1.25rem; }
+  @media (min-width:1024px) {
+    .admin-shell { grid-template-columns:240px minmax(0,1fr); align-items:start; }
+  }
+  .admin-nav {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:0.75rem;
+    position:sticky;
+    top:4.25rem;
+  }
+  .admin-nav-group { margin-bottom:0.5rem; }
+  .admin-nav-group:last-child { margin-bottom:0; }
+  .admin-nav-label {
+    font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--text4); padding:0.35rem 0.65rem 0.25rem;
+  }
+  .admin-nav-link {
+    display:flex; align-items:center; gap:0.5rem;
+    padding:0.5rem 0.65rem; border-radius:8px;
+    font-size:13px; font-weight:500; color:var(--text2);
+    text-decoration:none; transition:background .12s, color .12s;
+  }
+  .admin-nav-link:hover { background:var(--hover-bg); color:var(--text1); }
+  .admin-nav-link.active {
+    background:color-mix(in srgb, var(--brand-primary, #7c3aed) 12%, transparent);
+    color:var(--brand-primary, #7c3aed); font-weight:600;
+  }
+  .admin-nav-badge {
+    margin-left:auto; font-size:10px; font-weight:700;
+    background:#ef4444; color:#fff; padding:1px 6px; border-radius:999px;
+  }
+  .admin-page-head { margin-bottom:1.25rem; }
+  .admin-page-head h1 { font-size:1.35rem; font-weight:700; color:var(--text1); }
+  .admin-page-head p { font-size:0.8125rem; color:var(--text4); margin-top:0.25rem; }
+</style>
+
+<div class="admin-shell">
+  <aside class="admin-nav">
+    <a href="{{ url_for('admin_dashboard') }}"
+       class="admin-nav-link mb-1 {% if ep=='admin_dashboard' %}active{% endif %}">
+      🏠 Inicio
+    </a>
+
+    <div class="admin-nav-group">
+      <p class="admin-nav-label">Comunidad</p>
+      <a href="{{ url_for('admin_settings') }}" class="admin-nav-link {% if ep=='admin_settings' %}active{% endif %}">⚙️ Ajustes y marca</a>
+      <a href="{{ url_for('admin_landing') }}" class="admin-nav-link {% if ep=='admin_landing' %}active{% endif %}">🌸 Landing principal</a>
+      <a href="{{ url_for('new_post') }}" class="admin-nav-link {% if ep=='new_post' %}active{% endif %}">✏️ Publicar post</a>
+      <a href="{{ url_for('features.admin_moderation') }}" class="admin-nav-link {% if ep=='features.admin_moderation' %}active{% endif %}">
+        🛡 Moderación
+        {% if admin_nav.pending_reports %}<span class="admin-nav-badge">{{ admin_nav.pending_reports }}</span>{% endif %}
+      </a>
+    </div>
+
+    <div class="admin-nav-group">
+      <p class="admin-nav-label">Contenido</p>
+      <a href="{{ url_for('library.admin_list') }}" class="admin-nav-link {% if ep and ep.startswith('library.') %}active{% endif %}">📚 Biblioteca</a>
+      <a href="{{ url_for('resources.admin_list') }}" class="admin-nav-link {% if ep and ep.startswith('resources.') %}active{% endif %}">📎 Recursos</a>
+      <a href="{{ url_for('admin_courses') }}" class="admin-nav-link {% if ep in ('admin_courses','admin_new_course','admin_edit_course') %}active{% endif %}">🎓 Cursos (legacy)</a>
+    </div>
+
+    <div class="admin-nav-group">
+      <p class="admin-nav-label">Calendario</p>
+      <a href="{{ url_for('admin_live_classes') }}" class="admin-nav-link {% if ep in ('admin_live_classes','admin_new_live_class','admin_edit_live_class') %}active{% endif %}">📅 Eventos</a>
+      <a href="{{ url_for('admin_calendar_theme') }}" class="admin-nav-link {% if ep=='admin_calendar_theme' %}active{% endif %}">🎨 Temática mensual</a>
+    </div>
+
+    <div class="admin-nav-group">
+      <p class="admin-nav-label">Miembros</p>
+      <a href="{{ url_for('admin_users') }}" class="admin-nav-link {% if ep=='admin_users' %}active{% endif %}">👥 Usuarios</a>
+      <a href="{{ url_for('admin_subscriptions') }}" class="admin-nav-link {% if ep=='admin_subscriptions' %}active{% endif %}">
+        📊 Suscripciones
+        {% if admin_nav.whatsapp_pending %}<span class="admin-nav-badge">{{ admin_nav.whatsapp_pending }}</span>{% endif %}
+      </a>
+      <a href="{{ url_for('admin_email') }}" class="admin-nav-link {% if ep=='admin_email' %}active{% endif %}">📧 Email masivo</a>
+    </div>
+
+    <div class="admin-nav-group">
+      <p class="admin-nav-label">Facturación</p>
+      <a href="{{ url_for('admin_plans') }}" class="admin-nav-link {% if ep=='admin_plans' %}active{% endif %}">📋 Planes</a>
+      <a href="{{ url_for('admin_payments') }}" class="admin-nav-link {% if ep=='admin_payments' %}active{% endif %}">💳 Stripe</a>
+    </div>
+
+    <div class="admin-nav-group">
+      <p class="admin-nav-label">Sistema</p>
+      <a href="{{ url_for('features.admin_stats') }}" class="admin-nav-link {% if ep=='features.admin_stats' %}active{% endif %}">📈 Estadísticas</a>
+      <a href="{{ url_for('admin_backups') }}" class="admin-nav-link {% if ep=='admin_backups' %}active{% endif %}">💾 Backups</a>
+      <a href="{{ url_for('features.admin_assignments') }}" class="admin-nav-link {% if ep=='features.admin_assignments' %}active{% endif %}">📤 Entregas</a>
+    </div>
+  </aside>
+
+  <div class="admin-main min-w-0">

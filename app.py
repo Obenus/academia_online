@@ -19,24 +19,38 @@ from sqlalchemy import text
 from models import (db, User, Category, Post, Comment,
                     Course, Section, Lesson, LessonFile, LessonImage, Enrollment, LessonProgress, LiveClass,
                     SiteSettings, PointEvent, Notification, SubscriptionPlan,
-                    Quiz, Assignment, PostReport, CourseCertificate, LiveClassCategory)
+                    Quiz, Assignment, PostReport, CourseCertificate, LiveClassCategory,
+                    CheckoutIntent, CalendarMonthTheme, LibraryItem, Resource, ResourceTag)
 from calendar_categories import ensure_calendar_categories, category_event_colors
+from community_categories import ensure_community_categories, category_by_slug
+from geo_utils import detect_billing_region, billing_region_label
+from n8n_notify import notify_n8n_pregunta
+from registration import create_user_from_checkout
+from landing_content import (
+    LANDING_DEFAULTS, LANDING_FORM_FIELDS,
+    landing_text, landing_paragraphs, landing_lines,
+)
 from spain_provinces import (
     SPANISH_PROVINCES, CITY_OTHER_VALUE, CITY_OTHER_LABEL,
     parse_city_from_form, city_form_state, city_form_from_request,
 )
 from extensions import csrf, limiter, init_security
+from db_migrate import run_migrations
 from learning_utils import (
     course_progress, ordered_lessons, completed_lesson_ids,
     is_lesson_unlocked, issue_certificate,
 )
 from blueprints.features import bp as features_bp, register_bulk_email_routes, user_can_access_category
-from db_migrate import run_migrations
+from blueprints.library import bp as library_bp
+from blueprints.resources import bp as resources_bp
+from video_utils import video_thumbnail_url, video_embed_url
 from backup_manager import run_backup, encrypt_value, decrypt_value, list_local_backups, restore_backup
 from billing import (
     payments_enabled, get_stripe_secret, get_stripe_public, get_stripe_webhook_secret,
-    create_subscription_checkout, sync_stripe_subscription, send_welcome_email,
+    create_subscription_checkout, create_public_subscription_checkout,
+    sync_stripe_subscription, send_welcome_email,
     send_admin_registration_email, notify_admins_payment_failed, user_payment_label,
+    mark_whatsapp_vip_pending, video_embed_block,
 )
 
 app = Flask(__name__)
@@ -62,32 +76,18 @@ login_manager.login_message = 'Inicia sesión para continuar.'
 # ── Jinja helpers ─────────────────────────────────────────────────────────────
 
 def youtube_embed(url: str) -> str:
-    if not url:
-        return ''
-    # Vimeo
-    if 'vimeo.com' in url:
-        if 'player.vimeo.com' in url:
-            return url
-        # strip query string, split path after vimeo.com/
-        path = url.split('vimeo.com/')[1].split('?')[0]
-        parts = path.split('/')
-        vid = parts[0]
-        # si hay hash (vimeo.com/ID/HASH) lo añadimos como parámetro h=
-        if len(parts) > 1 and parts[1]:
-            return f'https://player.vimeo.com/video/{vid}?h={parts[1]}'
-        return f'https://player.vimeo.com/video/{vid}'
-    # YouTube
-    if 'youtu.be/' in url:
-        vid = url.split('youtu.be/')[1].split('?')[0]
-    elif 'v=' in url:
-        vid = url.split('v=')[1].split('&')[0]
-    elif 'embed/' in url:
-        return url
-    else:
-        return url
-    return f'https://www.youtube.com/embed/{vid}'
+    return video_embed_url(url)
+
+
+@app.template_filter('video_embed')
+def video_embed_secure(url: str) -> str:
+    from flask import request
+    origin = request.url_root.rstrip('/') if request else ''
+    return video_embed_url(url, origin=origin, locked=True)
+
 
 app.jinja_env.filters['youtube_embed'] = youtube_embed
+app.jinja_env.filters['video_thumbnail'] = video_thumbnail_url
 
 def timeago(dt: datetime) -> str:
     diff = datetime.utcnow() - dt
@@ -229,16 +229,46 @@ def inject_settings():
         site = get_settings()
     except Exception:
         site = None
-    return {
+    brand_style = ''
+    if site:
+        cp = getattr(site, 'color_primary', '') or '#7c3aed'
+        cs = getattr(site, 'color_secondary', '') or '#6d28d9'
+        ff = getattr(site, 'font_family', '') or ''
+        brand_style = f'--color-primary:{cp};--color-secondary:{cs};'
+        if ff:
+            brand_style += f'--font-family-body:{ff};--font-family-display:{ff};'
+    player_bar_style = _player_bar_style(site)
+    ctx = {
         'site': site or SiteSettings(),
         'academy_name': display_academy_name(site),
         'csrf_token': generate_csrf,
         'spanish_provinces': SPANISH_PROVINCES,
         'city_other_value': CITY_OTHER_VALUE,
         'city_other_label': CITY_OTHER_LABEL,
+        'brand_style': brand_style,
+        'player_bar_style': player_bar_style,
+        'video_embed_block': video_embed_block,
+        'admin_nav': _admin_nav_counts(),
     }
+    return ctx
+
+
+def _admin_nav_counts():
+    """Contadores para badges del menú admin (solo si hay sesión admin)."""
+    from flask_login import current_user
+    if not current_user.is_authenticated or not current_user.is_admin:
+        return {'pending_reports': 0, 'whatsapp_pending': 0}
+    try:
+        return {
+            'pending_reports': PostReport.query.filter_by(status='pending').count(),
+            'whatsapp_pending': User.query.filter_by(whatsapp_vip_pending=True).count(),
+        }
+    except Exception:
+        return {'pending_reports': 0, 'whatsapp_pending': 0}
 
 app.register_blueprint(features_bp)
+app.register_blueprint(library_bp)
+app.register_blueprint(resources_bp)
 register_bulk_email_routes(app, mail, get_settings)
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
@@ -257,37 +287,55 @@ def admin_required(f):
 
 # ── AUTH ──────────────────────────────────────────────────────────────────────
 
+def _conversion_landing_context():
+    site = get_settings()
+    region = detect_billing_region('es')
+    plans = SubscriptionPlan.query.filter_by(is_active=True).order_by(
+        SubscriptionPlan.sort_order, SubscriptionPlan.id
+    ).all()
+    return dict(
+        site=site,
+        plans=plans,
+        region=region,
+        region_label=billing_region_label(region),
+        stripe_pk=get_stripe_public(app),
+        landing_text=landing_text,
+        landing_paragraphs=landing_paragraphs,
+        landing_lines=landing_lines,
+    )
+
+
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit('15 per minute')
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('community'))
+        return redirect(url_for('start_here'))
+    ctx = _conversion_landing_context()
     if request.method == 'POST':
         email = request.form.get('email', '').strip().lower()
         pw    = request.form.get('password', '')
         user  = User.query.filter_by(email=email).first()
         if user and user.check_password(pw):
-            # Force activate admins regardless of status
             if user.role == 'admin' and getattr(user, 'status', 'active') != 'active':
                 user.status = 'active'
                 db.session.commit()
             if getattr(user, 'status', 'active') == 'pending':
                 flash('Tu cuenta está pendiente de aprobación por un administrador. Te avisaremos pronto.', 'error')
-                return render_template('auth/login.html')
+                return render_template('public/conversion_landing.html', **ctx)
             if getattr(user, 'status', 'active') == 'rejected':
                 flash('Tu solicitud de acceso ha sido denegada. Contacta con el administrador.', 'error')
-                return render_template('auth/login.html')
+                return render_template('public/conversion_landing.html', **ctx)
             if getattr(user, 'status', 'active') == 'suspended':
                 flash('Tu cuenta está suspendida por impago o revisión administrativa. Contacta con soporte.', 'error')
-                return render_template('auth/login.html')
+                return render_template('public/conversion_landing.html', **ctx)
             if (not user.is_admin and not getattr(user, 'is_free_billing', False)
                     and payments_enabled(app) and getattr(user, 'subscription_status', 'none') == 'past_due'):
                 flash('Tu suscripción tiene un pago pendiente. Contacta con el administrador.', 'error')
-                return render_template('auth/login.html')
+                return render_template('public/conversion_landing.html', **ctx)
             login_user(user, remember=True)
-            return redirect(request.args.get('next') or url_for('community'))
+            return redirect(request.args.get('next') or url_for('start_here'))
         flash('Email o contraseña incorrectos.', 'error')
-    return render_template('auth/login.html')
+    return render_template('public/conversion_landing.html', **ctx)
 
 def _finalize_registration_payment(user, plan, session_obj=None):
     """Tras pago Stripe: activar o dejar pendiente y enviar emails."""
@@ -344,143 +392,12 @@ def _finalize_registration_payment(user, plan, session_obj=None):
 @app.route('/registro', methods=['GET', 'POST'])
 @limiter.limit('10 per hour')
 def register():
-    if current_user.is_authenticated:
-        return redirect(url_for('community'))
-
-    errors = {}
-    form   = {}
-    pay_on = payments_enabled(app)
-    plans  = SubscriptionPlan.query.filter_by(is_active=True).order_by(SubscriptionPlan.sort_order, SubscriptionPlan.id).all() if pay_on else []
-
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        email    = request.form.get('email', '').strip().lower()
-        pw       = request.form.get('password', '')
-        bio      = request.form.get('bio', '').strip()
-        avatar   = request.files.get('avatar')
-        plan_id  = request.form.get('plan_id', type=int)
-        billing_interval = request.form.get('billing_interval', 'month')
-        promo_code = request.form.get('promo_code', '').strip()
-
-        city = parse_city_from_form(request.form)
-        form = {'username': username, 'email': email, 'bio': bio,
-                'plan_id': plan_id, 'billing_interval': billing_interval, 'promo_code': promo_code}
-
-        if not username or len(username) < 3:
-            errors['username'] = 'El nombre debe tener al menos 3 caracteres.'
-        elif User.query.filter_by(username=username).first():
-            errors['username'] = 'Ese nombre de usuario ya está en uso.'
-
-        if not email or '@' not in email:
-            errors['email'] = 'Introduce un email válido.'
-        elif User.query.filter_by(email=email).first():
-            errors['email'] = 'Ese email ya está registrado.'
-
-        if not pw or len(pw) < 6:
-            errors['password'] = 'La contraseña debe tener al menos 6 caracteres.'
-
-        if request.form.get('city') == CITY_OTHER_VALUE and not request.form.get('city_other', '').strip():
-            errors['city'] = 'Indica el nombre de tu ciudad.'
-
-        plan = None
-        if pay_on:
-            if not plan_id:
-                errors['plan'] = 'Selecciona un plan de suscripción.'
-            else:
-                plan = SubscriptionPlan.query.filter_by(id=plan_id, is_active=True).first()
-                if not plan:
-                    errors['plan'] = 'Plan no válido.'
-
-        if not errors:
-            avatar_data, avatar_mime = None, 'image/jpeg'
-            if avatar and avatar.filename:
-                raw_avatar = avatar.read()
-                if len(raw_avatar) > 4 * 1024 * 1024:
-                    errors['avatar'] = 'La imagen no puede superar 4 MB.'
-                else:
-                    avatar_data, avatar_mime = _compress_image(
-                        raw_avatar, max_w=300, max_h=300, quality=82, square=True)
-
-            if not errors:
-                user = User(username=username, email=email, bio=bio, city=city,
-                            avatar_data=avatar_data, avatar_mime=avatar_mime,
-                            status='pending', billing_type='standard',
-                            subscription_plan_id=plan.id if plan else None)
-                user.set_password(pw)
-                db.session.add(user)
-                db.session.commit()
-
-                if pay_on and plan:
-                    try:
-                        session = create_subscription_checkout(
-                            app, user, plan,
-                            success_url=url_for('register_checkout_success', _external=True)
-                                      + '?session_id={CHECKOUT_SESSION_ID}',
-                            cancel_url=url_for('register', _external=True),
-                            billing_interval=billing_interval,
-                            promotion_code=promo_code or None,
-                        )
-                        return redirect(session.url)
-                    except Exception as e:
-                        db.session.delete(user)
-                        db.session.commit()
-                        errors['plan'] = f'No se pudo iniciar el pago: {e}'
-                elif not errors:
-                    for admin in User.query.filter_by(role='admin').all():
-                        notify(admin.id, 'new_user',
-                               f'🙋 Nueva solicitud de acceso de {username} ({email})',
-                               url_for('admin_users'))
-                    db.session.commit()
-                    try:
-                        send_admin_registration_email(
-                            app, mail, user, '—', 'Pendiente de aprobación (sin pago online)', plan=None)
-                    except Exception as e:
-                        print(f'[billing] admin reg email: {e}')
-                    return render_template('auth/pending.html')
-
-    site = get_settings()
-    city_state = (city_form_from_request(request.form) if request.method == 'POST'
-                  else city_form_state(''))
-    return render_template(
-        'auth/register.html',
-        errors=errors, form=form, plans=plans, pay_on=pay_on,
-        city_state=city_state,
-        stripe_pk=get_stripe_public(app),
-        academy_name=display_academy_name(site),
-    )
+    return redirect(url_for('login'))
 
 
 @app.route('/registro/exito')
 def register_checkout_success():
-    session_id = request.args.get('session_id', '')
-    if not session_id or not session_id.startswith('cs_'):
-        flash('Sesión de pago no válida.', 'error')
-        return redirect(url_for('register'))
-
-    try:
-        import stripe
-        stripe.api_key = get_stripe_secret(app)
-        sess = stripe.checkout.Session.retrieve(session_id, expand=['subscription'])
-        if sess.payment_status != 'paid':
-            flash('El pago no se ha completado.', 'error')
-            return redirect(url_for('register'))
-        user_id = int(sess.metadata.get('user_id', 0) or sess.client_reference_id or 0)
-        plan_id = int(sess.metadata.get('plan_id', 0))
-        user = User.query.get(user_id)
-        plan = SubscriptionPlan.query.get(plan_id) if plan_id else None
-        if not user:
-            flash('Usuario no encontrado.', 'error')
-            return redirect(url_for('register'))
-        _finalize_registration_payment(user, plan, sess)
-        s = get_settings()
-        if s and s.pay_auto_activate:
-            login_user(user, remember=True)
-            flash('¡Registro y pago completados! Bienvenido/a.', 'success')
-            return redirect(url_for('community'))
-        return render_template('auth/pending.html', paid=True)
-    except Exception as e:
-        flash(f'Error al verificar el pago: {e}', 'error')
-        return redirect(url_for('register'))
+    return redirect(url_for('checkout_success', session_id=request.args.get('session_id', '')))
 
 @app.route('/logout')
 @login_required
@@ -575,9 +492,127 @@ def account_settings():
         city_state=city_form_state(current_user.city),
     )
 
-# ── COMMUNITY ─────────────────────────────────────────────────────────────────
+# ── LANDING PÚBLICA Y CHECKOUT ─────────────────────────────────────────────────
 
 @app.route('/')
+def landing():
+    if current_user.is_authenticated:
+        return redirect(url_for('start_here'))
+    return redirect(url_for('login'))
+
+
+@app.route('/checkout/iniciar', methods=['POST'])
+@csrf.exempt
+@limiter.limit('20 per hour')
+def checkout_start():
+    plan_id = request.form.get('plan_id', type=int)
+    region = detect_billing_region('es')
+    plan = SubscriptionPlan.query.filter_by(id=plan_id, is_active=True).first()
+    if not plan or not payments_enabled(app):
+        flash('Plan no disponible o pagos no configurados.', 'error')
+        return redirect(url_for('login'))
+    intent = CheckoutIntent(plan_id=plan.id, billing_region=region, status='pending')
+    db.session.add(intent)
+    db.session.commit()
+    try:
+        session = create_public_subscription_checkout(
+            app, plan, region,
+            success_url=url_for('checkout_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=url_for('login', _external=True),
+            checkout_intent_id=intent.id,
+        )
+        return redirect(session.url)
+    except Exception as e:
+        db.session.delete(intent)
+        db.session.commit()
+        flash(f'No se pudo iniciar el pago: {e}', 'error')
+        return redirect(url_for('login'))
+
+
+@app.route('/checkout/exito')
+def checkout_success():
+    course_id  = request.args.get('course_id', type=int)
+    session_id = request.args.get('session_id', '')
+    if course_id:
+        if not current_user.is_authenticated:
+            flash('Inicia sesión para completar la inscripción al curso.', 'error')
+            return redirect(url_for('login'))
+        if not session_id:
+            flash('Enlace de pago no válido.', 'error')
+            return redirect(url_for('courses'))
+        stripe_key = get_stripe_secret(app)
+        payment_ok = False
+        if stripe_key and session_id.startswith('cs_'):
+            try:
+                import stripe
+                stripe.api_key = stripe_key
+                s = stripe.checkout.Session.retrieve(session_id)
+                payment_ok = (s.payment_status == 'paid')
+            except Exception:
+                payment_ok = False
+        if payment_ok and not current_user.is_enrolled(course_id):
+            db.session.add(Enrollment(user_id=current_user.id,
+                                      course_id=course_id,
+                                      stripe_session_id=session_id))
+            db.session.commit()
+            flash('¡Pago completado! Ya tienes acceso al curso.', 'success')
+        elif current_user.is_enrolled(course_id):
+            flash('Ya estás inscrito en este curso.', 'success')
+        else:
+            flash('No se pudo verificar el pago. Contacta con el administrador.', 'error')
+        return redirect(url_for('learn', course_id=course_id))
+
+    if not session_id or not session_id.startswith('cs_'):
+        flash('Sesión de pago no válida.', 'error')
+        return redirect(url_for('login'))
+    try:
+        import stripe
+        stripe.api_key = get_stripe_secret(app)
+        sess = stripe.checkout.Session.retrieve(session_id, expand=['subscription'])
+        if sess.payment_status != 'paid':
+            flash('El pago no se ha completado.', 'error')
+            return redirect(url_for('login'))
+        user, created, _pw = create_user_from_checkout(app, mail, sess, get_settings)
+        if not user:
+            flash('No se pudo crear la cuenta. Contacta con soporte.', 'error')
+            return redirect(url_for('login'))
+        login_user(user, remember=True)
+        flash('¡Bienvenida! Revisa tu email con los datos de acceso.', 'success')
+        return redirect(url_for('start_here'))
+    except Exception as e:
+        flash(f'Error al verificar el pago: {e}', 'error')
+        return redirect(url_for('login'))
+
+
+@app.route('/empieza')
+@login_required
+def start_here():
+    site = get_settings()
+    return render_template('start/index.html', site=site)
+
+
+@app.route('/webhooks/grabacion', methods=['POST'])
+@csrf.exempt
+def webhook_recording():
+    secret = (app.config.get('RECORDING_WEBHOOK_SECRET') or '').strip()
+    if not secret or request.headers.get('X-Webhook-Secret') != secret:
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.get_json(silent=True) or {}
+    from blueprints.library import upsert_recording_from_webhook
+    item = upsert_recording_from_webhook(
+        live_class_id=data.get('live_class_id'),
+        recording_url=data.get('recording_url') or data.get('url', ''),
+        title=data.get('title'),
+        year=data.get('year'),
+        month=data.get('month'),
+    )
+    if not item:
+        return jsonify({'error': 'Invalid payload'}), 400
+    return jsonify({'ok': True, 'library_item_id': item.id}), 200
+
+
+# ── COMMUNITY ─────────────────────────────────────────────────────────────────
+
 @app.route('/comunidad')
 @login_required
 def community():
@@ -593,7 +628,10 @@ def community():
     admin_count   = User.query.filter_by(role='admin').count()
     admins        = User.query.filter_by(role='admin').limit(5).all()
     online_users  = User.query.filter(User.last_seen >= five_min_ago).order_by(User.last_seen.desc()).limit(20).all()
-    top_month     = get_leaderboard(since=month_start)[:5]
+    site = get_settings()
+    member_of_month = None
+    if site and site.member_of_month_user_id:
+        member_of_month = User.query.get(site.member_of_month_user_id)
     now = datetime.utcnow()
     # Clase en directo ahora mismo (empezó hace menos de duration_min)
     from sqlalchemy import and_
@@ -610,8 +648,9 @@ def community():
     return render_template('community/feed.html',
                            posts=posts, categories=categories, active_cat=cat_id,
                            member_count=member_count, admin_count=admin_count,
-                           admins=admins, online_users=online_users, top_month=top_month,
-                           live_now=live_now, next_class=next_class)
+                           admins=admins, online_users=online_users,
+                           member_of_month=member_of_month, member_of_month_note=site.member_of_month_note if site else '',
+                           live_now=live_now, next_class=next_class, site=site)
 
 @app.route('/comunidad/nuevo', methods=['GET', 'POST'])
 @login_required
@@ -630,9 +669,13 @@ def new_post():
                 return render_template('community/new_post.html', categories=categories)
             post = Post(user_id=current_user.id, title=title,
                         content=content, category_id=category_id)
+            if cat and getattr(cat, 'slug', None) == 'preguntas-rocio':
+                post.workflow_status = 'pendiente'
             db.session.add(post)
             db.session.commit()
             award_points(current_user.id, 'post', post.id, 4)
+            if cat and getattr(cat, 'slug', None) == 'preguntas-rocio':
+                notify_n8n_pregunta(app, post, current_user)
             return redirect(url_for('community'))
     return render_template('community/new_post.html', categories=categories)
 
@@ -879,40 +922,7 @@ def complete_lesson(course_id, lesson_id):
 @app.route('/clasificacion')
 @login_required
 def leaderboard():
-    now = datetime.utcnow()
-    period = request.args.get('periodo', 'mensual')
-    if period == 'semanal':
-        since = now - timedelta(weeks=1)
-    elif period == 'anual':
-        since = now.replace(month=1, day=1, hour=0, minute=0, second=0)
-    else:
-        since = now.replace(day=1, hour=0, minute=0, second=0)
-    ranking = get_leaderboard(since=since)
-
-    # Mis puntos del periodo y totales — 2 queries simples
-    my_pts = (db.session.query(db.func.sum(PointEvent.points))
-              .filter(PointEvent.user_id == current_user.id,
-                      PointEvent.created_at >= since).scalar() or 0)
-    my_total_pts = (db.session.query(db.func.sum(PointEvent.points))
-                    .filter(PointEvent.user_id == current_user.id).scalar() or 0)
-    my_level = get_level(my_total_pts)
-
-    # Totales all-time de los usuarios en el ranking — 1 sola query GROUP BY
-    ranking_user_ids = [u.id for u, _ in ranking]
-    if ranking_user_ids:
-        total_rows = (db.session.query(PointEvent.user_id, db.func.sum(PointEvent.points))
-                      .filter(PointEvent.user_id.in_(ranking_user_ids))
-                      .group_by(PointEvent.user_id).all())
-        totals_map = {uid: (t or 0) for uid, t in total_rows}
-    else:
-        totals_map = {}
-
-    ranking_with_levels = [
-        (user, pts, get_level(totals_map.get(user.id, 0)))
-        for user, pts in ranking
-    ]
-    return render_template('leaderboard.html', ranking=ranking_with_levels, period=period,
-                           my_pts=my_pts, my_total_pts=my_total_pts, my_level=my_level)
+    return redirect(url_for('community'))
 
 # ── CALENDAR ──────────────────────────────────────────────────────────────────
 
@@ -926,7 +936,10 @@ def calendar():
     categories = LiveClassCategory.query.order_by(
         LiveClassCategory.sort_order, LiveClassCategory.name
     ).all()
-    return render_template('calendar/index.html', upcoming=upcoming, categories=categories)
+    now = datetime.utcnow()
+    month_theme = CalendarMonthTheme.query.filter_by(year=now.year, month=now.month).first()
+    return render_template('calendar/index.html', upcoming=upcoming, categories=categories,
+                           month_theme=month_theme)
 
 @app.route('/calendario/data')
 @login_required
@@ -954,6 +967,7 @@ def calendar_data():
                 'duration':    c.duration_min,
                 'category':    cat.name if cat else '',
                 'category_color': cat.color if cat else '',
+                'subtopic':    getattr(c, 'subtopic', '') or '',
             },
             'backgroundColor': bg,
             'borderColor':     border,
@@ -997,47 +1011,6 @@ def checkout(course_id):
         flash(f'Error al procesar el pago: {e}', 'error')
         return redirect(url_for('course_detail', course_id=course_id))
 
-@app.route('/checkout/exito')
-@login_required
-def checkout_success():
-    course_id  = request.args.get('course_id', type=int)
-    session_id = request.args.get('session_id', '')
-    if not course_id or not session_id:
-        flash('Enlace de pago no válido.', 'error')
-        return redirect(url_for('courses'))
-
-    # Verificar con Stripe que el pago fue completado realmente
-    stripe_key = app.config.get('STRIPE_SECRET_KEY', '')
-    payment_ok = False
-    if stripe_key and session_id.startswith('cs_'):
-        try:
-            import stripe
-            stripe.api_key = stripe_key
-            s = stripe.checkout.Session.retrieve(session_id)
-            payment_ok = (s.payment_status == 'paid' and
-                          s.metadata.get('course_id') == str(course_id) or
-                          # Fallback: verificar que el session pertenece al usuario actual
-                          s.client_reference_id == str(current_user.id) or
-                          s.payment_status == 'paid')
-        except Exception:
-            payment_ok = False
-    else:
-        # Sin Stripe configurado — no inscribir automáticamente
-        payment_ok = False
-
-    if payment_ok and not current_user.is_enrolled(course_id):
-        db.session.add(Enrollment(user_id=current_user.id,
-                                  course_id=course_id,
-                                  stripe_session_id=session_id))
-        db.session.commit()
-        flash('¡Pago completado! Ya tienes acceso al curso.', 'success')
-    elif current_user.is_enrolled(course_id):
-        flash('Ya estás inscrito en este curso.', 'success')
-    else:
-        flash('No se pudo verificar el pago. Contacta con el administrador.', 'error')
-    return redirect(url_for('learn', course_id=course_id))
-
-
 @app.route('/webhooks/stripe', methods=['POST'])
 @csrf.exempt
 @limiter.limit('120 per minute')
@@ -1058,12 +1031,16 @@ def stripe_webhook():
     data = event['data']['object']
 
     if etype == 'checkout.session.completed' and data.get('mode') == 'subscription':
-        user_id = int(data.get('metadata', {}).get('user_id', 0) or data.get('client_reference_id', 0) or 0)
-        plan_id = int(data.get('metadata', {}).get('plan_id', 0) or 0)
-        user = User.query.get(user_id)
-        plan = SubscriptionPlan.query.get(plan_id) if plan_id else None
-        if user and user.status == 'pending':
-            _finalize_registration_payment(user, plan, data)
+        meta = data.get('metadata') or {}
+        if meta.get('checkout_intent_id') or not meta.get('user_id'):
+            create_user_from_checkout(app, mail, data, get_settings)
+        else:
+            user_id = int(meta.get('user_id', 0) or data.get('client_reference_id', 0) or 0)
+            plan_id = int(meta.get('plan_id', 0) or 0)
+            user = User.query.get(user_id)
+            plan = SubscriptionPlan.query.get(plan_id) if plan_id else None
+            if user and user.status == 'pending':
+                _finalize_registration_payment(user, plan, data)
 
     elif etype in ('invoice.payment_succeeded', 'invoice.paid'):
         sub_id = data.get('subscription')
@@ -1091,8 +1068,9 @@ def stripe_webhook():
         if user and user.billing_type != 'free':
             user.subscription_status = 'past_due'
             user.status = 'suspended'
+            mark_whatsapp_vip_pending(user)
             db.session.commit()
-            notify_admins_payment_failed(db, notify, user, 'pago fallido')
+            notify_admins_payment_failed(db, notify, user, 'pago fallido', app=app, mail=mail)
             db.session.commit()
 
     elif etype in ('customer.subscription.deleted', 'customer.subscription.updated'):
@@ -1103,7 +1081,9 @@ def stripe_webhook():
             if data.get('status') in ('canceled', 'unpaid', 'past_due'):
                 if data.get('status') != 'past_due' or user.status == 'active':
                     user.status = 'suspended'
-                notify_admins_payment_failed(db, notify, user, data.get('status', 'actualizado'))
+                mark_whatsapp_vip_pending(user)
+                reason = 'cancelación' if data.get('status') == 'canceled' else data.get('status', 'actualizado')
+                notify_admins_payment_failed(db, notify, user, reason, app=app, mail=mail)
             db.session.commit()
 
     return jsonify({'ok': True}), 200
@@ -1120,6 +1100,9 @@ def admin_dashboard():
         'courses':     Course.query.count(),
         'posts':       Post.query.count(),
         'enrollments': Enrollment.query.count(),
+        'library':     LibraryItem.query.count(),
+        'resources':   Resource.query.count(),
+        'active_subs': User.query.filter_by(subscription_status='active', role='student').count(),
     }
     categories = Category.query.all()
     all_plans = SubscriptionPlan.query.filter_by(is_active=True).order_by(SubscriptionPlan.sort_order).all()
@@ -1168,6 +1151,34 @@ def _cached_image(data, mimetype, max_age=86400):
 
 def _is_true(value):
     return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _hex_color(value, default=''):
+    """Normaliza color #RGB o #RRGGBB; devuelve default si no es válido."""
+    import re
+    if not value:
+        return default
+    v = value.strip()
+    m = re.match(r'^#([0-9a-fA-F]{3})$', v)
+    if m:
+        h = m.group(1)
+        return '#' + ''.join(c * 2 for c in h).lower()
+    m = re.match(r'^#([0-9a-fA-F]{6})$', v)
+    if m:
+        return '#' + m.group(1).lower()
+    return default
+
+
+def _player_bar_style(site):
+    if not site:
+        return ''
+    bg = _hex_color(getattr(site, 'player_bar_bg', None), '#141414')
+    accent = _hex_color(getattr(site, 'player_bar_accent', None), '') or _hex_color(
+        getattr(site, 'color_primary', None), '#7c3aed'
+    )
+    text = _hex_color(getattr(site, 'player_bar_text', None), '#bfbfbf')
+    btn = _hex_color(getattr(site, 'player_bar_btn', None), '#2a2a2a')
+    return f'--lib-player-bg:{bg};--lib-player-accent:{accent};--lib-player-text:{text};--lib-player-btn:{btn};'
 
 
 def _run_backup_now(settings: SiteSettings):
@@ -1229,6 +1240,24 @@ def admin_settings():
         s.event_reminder_email_body = request.form.get('event_reminder_email_body', '').strip()
         s.event_reminder_24h_enabled = request.form.get('event_reminder_24h_enabled') == 'on'
         s.event_reminder_1h_enabled = request.form.get('event_reminder_1h_enabled') == 'on'
+        s.billing_alert_email_subject = request.form.get('billing_alert_email_subject', '').strip()
+        s.billing_alert_email_body = request.form.get('billing_alert_email_body', '').strip()
+        s.welcome_video_url = request.form.get('welcome_video_url', '').strip()
+        s.how_it_works_video_url = request.form.get('how_it_works_video_url', '').strip()
+        s.start_page_intro = request.form.get('start_page_intro', '').strip()
+        s.whatsapp_url = request.form.get('whatsapp_url', '').strip()
+        s.brand_logo_url = request.form.get('brand_logo_url', '').strip()
+        s.color_primary = _hex_color(request.form.get('color_primary'), s.color_primary or '#7c3aed')
+        s.color_secondary = _hex_color(request.form.get('color_secondary'), s.color_secondary or '#6d28d9')
+        s.font_family = request.form.get('font_family', '').strip()
+        s.player_bar_bg = _hex_color(request.form.get('player_bar_bg'), '#141414')
+        s.player_bar_accent = _hex_color(request.form.get('player_bar_accent'), '')
+        s.player_bar_text = _hex_color(request.form.get('player_bar_text'), '#bfbfbf')
+        s.player_bar_btn = _hex_color(request.form.get('player_bar_btn'), '#2a2a2a')
+        mom_uid = request.form.get('member_of_month_user_id', type=int)
+        s.member_of_month_user_id = mom_uid or None
+        s.member_of_month_note = request.form.get('member_of_month_note', '').strip()
+        s.member_of_month_month = request.form.get('member_of_month_month', '').strip()
         img = request.files.get('community_image_file')
         if img and img.filename:
             s.community_image_data, s.community_image_mime = _compress_image(
@@ -1241,7 +1270,9 @@ def admin_settings():
         default_welcome_subject, default_welcome_body,
         default_admin_reg_subject, default_admin_reg_body,
         default_event_reminder_subject, default_event_reminder_body,
+        default_billing_alert_subject, default_billing_alert_body,
     )
+    active_users = User.query.filter_by(status='active', role='student').order_by(User.username).all()
     return render_template(
         'admin/settings.html', s=s,
         default_welcome_subject=default_welcome_subject(),
@@ -1250,6 +1281,32 @@ def admin_settings():
         default_admin_body=default_admin_reg_body(),
         default_event_reminder_subject=default_event_reminder_subject(),
         default_event_reminder_body=default_event_reminder_body(),
+        default_billing_alert_subject=default_billing_alert_subject(),
+        default_billing_alert_body=default_billing_alert_body(),
+        active_users=active_users,
+    )
+
+
+@app.route('/admin/landing', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_landing():
+    s = get_settings()
+    if request.method == 'POST':
+        if request.form.get('action') == 'reset':
+            for field in LANDING_FORM_FIELDS:
+                if hasattr(s, field):
+                    setattr(s, field, LANDING_DEFAULTS.get(field, ''))
+            flash('Textos restaurados al contenido original del PDF.', 'success')
+        else:
+            for field in LANDING_FORM_FIELDS:
+                if hasattr(s, field):
+                    setattr(s, field, request.form.get(field, '').strip())
+            flash('Landing principal guardada.', 'success')
+        db.session.commit()
+        return redirect(url_for('admin_landing'))
+    return render_template(
+        'admin/landing.html', s=s, defaults=LANDING_DEFAULTS, fields=LANDING_FORM_FIELDS,
     )
 
 
@@ -1379,6 +1436,16 @@ def admin_plans():
         except ValueError:
             price_f = 0.0
         stripe_price = request.form.get('plan_stripe_price_id', '').strip()
+        price_es = request.form.get('plan_price_es', '0').replace(',', '.')
+        price_intl = request.form.get('plan_price_intl', '0').replace(',', '.')
+        try:
+            price_es_f = float(price_es)
+        except ValueError:
+            price_es_f = price_f
+        try:
+            price_intl_f = float(price_intl)
+        except ValueError:
+            price_intl_f = price_f
         price_y = request.form.get('plan_price_yearly', '0').replace(',', '.')
         try:
             price_y_f = float(price_y)
@@ -1389,8 +1456,11 @@ def admin_plans():
         if name:
             db.session.add(SubscriptionPlan(
                 name=name, description=desc, price_monthly=price_f,
+                price_monthly_es=price_es_f, price_monthly_intl=price_intl_f,
                 price_yearly=price_y_f,
                 stripe_price_id=stripe_price,
+                stripe_price_id_es=request.form.get('plan_stripe_price_id_es', '').strip(),
+                stripe_price_id_intl=request.form.get('plan_stripe_price_id_intl', '').strip(),
                 stripe_price_id_yearly=request.form.get('plan_stripe_price_id_yearly', '').strip(),
                 trial_days=trial, stripe_coupon_id=coupon,
                 is_active=True,
@@ -1405,8 +1475,12 @@ def admin_plans():
     for p in plans_raw:
         plans.append({
             'id': p.id, 'name': p.name, 'description': p.description,
-            'price_monthly': p.price_monthly, 'price_yearly': getattr(p, 'price_yearly', 0) or 0,
+            'price_monthly': p.price_monthly, 'price_monthly_es': p.price_for_region('es'),
+            'price_monthly_intl': p.price_for_region('intl'),
+            'price_yearly': getattr(p, 'price_yearly', 0) or 0,
             'stripe_price_id': p.stripe_price_id,
+            'stripe_price_id_es': getattr(p, 'stripe_price_id_es', '') or '',
+            'stripe_price_id_intl': getattr(p, 'stripe_price_id_intl', '') or '',
             'stripe_price_id_yearly': getattr(p, 'stripe_price_id_yearly', '') or '',
             'trial_days': getattr(p, 'trial_days', 0) or 0,
             'stripe_coupon_id': getattr(p, 'stripe_coupon_id', '') or '',
@@ -1430,6 +1504,18 @@ def admin_edit_plan(plan_id):
         flash('Precio no válido.', 'error')
         return _redirect_plans()
     plan.stripe_price_id = request.form.get('plan_stripe_price_id', '').strip()
+    pes = request.form.get('plan_price_es', '0').replace(',', '.')
+    pintl = request.form.get('plan_price_intl', '0').replace(',', '.')
+    try:
+        plan.price_monthly_es = float(pes)
+    except ValueError:
+        pass
+    try:
+        plan.price_monthly_intl = float(pintl)
+    except ValueError:
+        pass
+    plan.stripe_price_id_es = request.form.get('plan_stripe_price_id_es', '').strip()
+    plan.stripe_price_id_intl = request.form.get('plan_stripe_price_id_intl', '').strip()
     py = request.form.get('plan_price_yearly', '0').replace(',', '.')
     try:
         plan.price_yearly = float(py)
@@ -1513,6 +1599,30 @@ def admin_set_user_free(user_id):
     return redirect(url_for('admin_subscriptions'))
 
 
+@app.route('/admin/suscripciones/<int:user_id>/whatsapp-ok', methods=['POST'])
+@login_required
+@admin_required
+def admin_clear_whatsapp_vip(user_id):
+    user = User.query.get_or_404(user_id)
+    user.whatsapp_vip_pending = False
+    db.session.commit()
+    flash(f'WhatsApp VIP marcado como gestionado para {user.username}.', 'success')
+    return redirect(url_for('admin_subscriptions'))
+
+
+@app.route('/admin/posts/<int:post_id>/estado', methods=['POST'])
+@login_required
+@admin_required
+def admin_post_workflow_status(post_id):
+    post = Post.query.get_or_404(post_id)
+    status = request.form.get('workflow_status', '').strip()
+    if status in ('pendiente', 'respondida', 'importante', 'idea_contenido'):
+        post.workflow_status = status
+        db.session.commit()
+        flash('Estado del post actualizado.', 'success')
+    return redirect(request.referrer or url_for('community'))
+
+
 @app.route('/admin/categorias/nueva', methods=['POST'])
 @login_required
 @admin_required
@@ -1532,6 +1642,9 @@ def admin_new_category():
 @admin_required
 def admin_delete_category(cat_id):
     cat = Category.query.get_or_404(cat_id)
+    if getattr(cat, 'is_system', False):
+        flash('Las categorías del sistema no se pueden eliminar.', 'error')
+        return redirect(url_for('admin_dashboard'))
     db.session.delete(cat)
     db.session.commit()
     flash('Categoría eliminada.', 'success')
@@ -1909,6 +2022,39 @@ def admin_delete_calendar_category(cat_id):
         flash('Categoría eliminada.', 'success')
     return redirect(url_for('admin_live_classes'))
 
+
+@app.route('/admin/calendario/tematica', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_calendar_theme():
+    now = datetime.utcnow()
+    year = request.args.get('year', type=int) or now.year
+    month = request.args.get('month', type=int) or now.month
+    theme = CalendarMonthTheme.query.filter_by(year=year, month=month).first()
+    if request.method == 'POST':
+        title = request.form.get('theme_title', '').strip()
+        desc = request.form.get('description', '').strip()
+        year = int(request.form.get('year', year))
+        month = int(request.form.get('month', month))
+        if not title:
+            flash('El título de la temática es obligatorio.', 'error')
+        else:
+            theme = CalendarMonthTheme.query.filter_by(year=year, month=month).first()
+            if not theme:
+                theme = CalendarMonthTheme(year=year, month=month, theme_title=title, description=desc)
+                db.session.add(theme)
+            else:
+                theme.theme_title = title
+                theme.description = desc
+            db.session.commit()
+            flash('Temática mensual guardada.', 'success')
+            return redirect(url_for('admin_calendar_theme', year=year, month=month))
+    month_names = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+    return render_template('admin/calendar_theme.html', theme=theme, year=year, month=month,
+                           month_names=month_names)
+
+
 @app.route('/admin/clases/nueva', methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -1930,6 +2076,7 @@ def admin_new_live_class():
             instructor   = request.form.get('instructor', '').strip(),
             recurrence   = recurrence,
             category_id  = category_id,
+            subtopic     = request.form.get('subtopic', '').strip(),
         )
         db.session.add(lc)
         db.session.flush()  # get lc.id before commit
@@ -1956,6 +2103,7 @@ def admin_new_live_class():
                     recurrence   = recurrence,
                     parent_id    = lc.id,
                     category_id  = lc.category_id,
+                    subtopic     = lc.subtopic,
                 ))
 
         db.session.commit()
@@ -1986,6 +2134,7 @@ def admin_edit_live_class(class_id):
         lc.instructor   = request.form.get('instructor', '').strip()
         lc.duration_min = int(request.form.get('duration', 60) or 60)
         lc.category_id = request.form.get('category_id', type=int)
+        lc.subtopic = request.form.get('subtopic', '').strip()
         try:
             lc.scheduled_at = datetime.fromisoformat(request.form.get('scheduled_at', ''))
         except Exception:
@@ -2000,6 +2149,7 @@ def admin_edit_live_class(class_id):
                 child.instructor   = lc.instructor
                 child.duration_min = lc.duration_min
                 child.category_id  = lc.category_id
+                child.subtopic     = lc.subtopic
         db.session.commit()
         flash('Evento actualizado.', 'success')
         return redirect(url_for('calendar'))
@@ -2203,15 +2353,7 @@ def members():
              .filter(User.status == 'active')
              .order_by(User.created_at.asc())
              .all())
-    # Una sola query GROUP BY para todos los puntos (evita N+1)
-    pts_rows = (db.session.query(PointEvent.user_id, db.func.sum(PointEvent.points))
-                .group_by(PointEvent.user_id).all())
-    pts_map = {uid: (total or 0) for uid, total in pts_rows}
-
-    members_data = [
-        {'user': u, 'pts': pts_map.get(u.id, 0), 'level': get_level(pts_map.get(u.id, 0))}
-        for u in users
-    ]
+    members_data = [{'user': u} for u in users]
     pending = []
     if current_user.is_admin:
         pending = User.query.filter_by(status='pending').order_by(User.created_at.desc()).all()
@@ -4302,6 +4444,22 @@ with app.app_context():
             conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_email_body TEXT DEFAULT ''"))
             conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_24h_enabled BOOLEAN DEFAULT TRUE"))
             conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_1h_enabled BOOLEAN DEFAULT TRUE"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS player_bar_bg VARCHAR(20) DEFAULT '#141414'"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS player_bar_accent VARCHAR(20) DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS player_bar_text VARCHAR(20) DEFAULT '#bfbfbf'"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS player_bar_btn VARCHAR(20) DEFAULT '#2a2a2a'"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_hook TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_intro TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_what_is TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_how_helps TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_explore_questions TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_includes TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_for_you TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_closing TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_cta_text VARCHAR(120) DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_price_note VARCHAR(200) DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_title VARCHAR(200) DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_subtitle VARCHAR(300) DEFAULT ''"))
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS subscription_plan (
                     id SERIAL PRIMARY KEY,
@@ -4353,12 +4511,13 @@ with app.app_context():
             """))
             run_migrations(conn)
             conn.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f'[DB] ERROR en migraciones: {e}')
     try:
         ensure_calendar_categories()
+        ensure_community_categories()
     except Exception as e:
-        print(f'[calendar] seed categories: {e}')
+        print(f'[seed] categories: {e}')
     sk = app.config.get('SECRET_KEY', '')
     if not sk or sk == 'cambiar-en-produccion-secret-key-aqui':
         print('[SECURITY] ⚠️ SECRET_KEY por defecto — configura secrets/secret_key antes de producción.')

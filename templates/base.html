@@ -153,55 +153,61 @@ document.addEventListener('DOMContentLoaded',function(){
   }
 </style>
 <link rel="stylesheet" href="/static/mobile.css"/>
+<link rel="stylesheet" href="/static/theme.css"/>
 <!-- Apply saved theme before render to avoid flash -->
 <script>
   if (localStorage.getItem('theme') === 'dark') document.getElementById('html-root').classList.add('dark');
 </script>
+{% if brand_style %}<style>:root{ {{ brand_style }} }</style>{% endif %}
 {% block head %}{% endblock %}
 </head>
 <body>
 {% set ep = request.endpoint or '' %}
-{% set nav_formaciones = ep in ('courses', 'learn', 'course_detail', 'enroll_free', 'checkout', 'checkout_success')
-    or ep in ('features.take_quiz', 'features.submit_assignment', 'features.download_certificate') %}
+{% set nav_library = ep and ep.startswith('library.') %}
+{% set nav_resources = ep and ep.startswith('resources.') %}
 
 <!-- TOP HEADER -->
 <header class="fixed top-0 left-0 right-0 h-14 bg-white border-b border-[#e4e4e7] z-50 flex items-center px-4 gap-3">
 
   <!-- Logo -->
-  <a href="{{ url_for('community') }}" class="flex items-center gap-2 flex-shrink-0">
-    <span class="text-xl">🎓</span>
+  <a href="{{ url_for('start_here') if current_user.is_authenticated else url_for('landing') }}" class="flex items-center gap-2 flex-shrink-0">
+    {% if site.brand_logo_url %}
+    <img src="{{ site.brand_logo_url }}" alt="" class="h-7 hidden sm:block"/>
+    {% else %}
+    <span class="text-xl">🌸</span>
+    {% endif %}
     <span class="font-bold text-sm hidden sm:block" style="color:var(--text1)">{{ site.academy_name }}</span>
   </a>
 
   <!-- Nav tabs — solo escritorio -->
   <nav class="hidden md:flex items-end h-full gap-1 flex-1 overflow-x-auto">
+    <a href="{{ url_for('start_here') }}"
+       class="tab-link {% if ep=='start_here' %}active{% endif %}">
+      🌸 Empieza
+    </a>
     <a href="{{ url_for('community') }}"
-       class="tab-link {% if request.endpoint in ('community','post_detail','new_post') %}active{% endif %}">
+       class="tab-link {% if ep in ('community','post_detail','new_post') %}active{% endif %}">
       💬 Comunidad
     </a>
-    <a href="{{ url_for('courses') }}"
-       class="tab-link {% if nav_formaciones %}active{% endif %}">
-      📚 Formaciones
-    </a>
-    <a href="{{ url_for('features.my_progress') }}"
-       class="tab-link {% if request.endpoint=='my_progress' %}active{% endif %}">
-      📈 Mi progreso
-    </a>
     <a href="{{ url_for('calendar') }}"
-       class="tab-link {% if request.endpoint=='calendar' %}active{% endif %}">
+       class="tab-link {% if ep=='calendar' %}active{% endif %}">
       📅 Calendario
     </a>
-    <a href="{{ url_for('leaderboard') }}"
-       class="tab-link {% if request.endpoint=='leaderboard' %}active{% endif %}">
-      🏆 Clasificación
+    <a href="{{ url_for('library.index') }}"
+       class="tab-link {% if nav_library %}active{% endif %}">
+      📚 Biblioteca
+    </a>
+    <a href="{{ url_for('resources.index') }}"
+       class="tab-link {% if nav_resources %}active{% endif %}">
+      📎 Recursos
     </a>
     <a href="{{ url_for('members') }}"
-       class="tab-link {% if request.endpoint=='members' %}active{% endif %}">
+       class="tab-link {% if ep=='members' %}active{% endif %}">
       👥 Miembros
     </a>
     {% if current_user.is_admin %}
     <a href="{{ url_for('admin_dashboard') }}"
-       class="tab-link {% if 'admin' in (request.endpoint or '') %}active{% endif %}">
+       class="tab-link {% if 'admin' in ep %}active{% endif %}">
       ⚙️ Admin
     </a>
     {% endif %}
@@ -257,9 +263,15 @@ document.addEventListener('DOMContentLoaded',function(){
         <a href="{{ url_for('account_settings') }}"
            class="flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5]"
            style="color:var(--text1)">⚙️ Mi cuenta</a>
-        <a href="{{ url_for('features.my_progress') }}"
+        <a href="{{ url_for('start_here') }}"
            class="flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5] md:hidden"
-           style="color:var(--text1)">📈 Mi progreso</a>
+           style="color:var(--text1)">🌸 Empieza</a>
+        <a href="{{ url_for('library.index') }}"
+           class="flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5] md:hidden"
+           style="color:var(--text1)">📚 Biblioteca</a>
+        <a href="{{ url_for('resources.index') }}"
+           class="flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5] md:hidden"
+           style="color:var(--text1)">📎 Recursos</a>
         {% if current_user.is_admin %}
         <a href="{{ url_for('admin_dashboard') }}"
            class="flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5] md:hidden"
@@ -280,25 +292,25 @@ document.addEventListener('DOMContentLoaded',function(){
 <!-- BARRA DE NAVEGACIÓN INFERIOR — solo móvil -->
 <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t"
      style="background:var(--surface);border-color:var(--border);padding-bottom:env(safe-area-inset-bottom)">
+  <a href="{{ url_for('start_here') }}"
+     class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-semibold transition
+            {% if ep=='start_here' %}text-violet-600{% else %}text-[#a1a1aa]{% endif %}">
+    <span class="text-xl leading-none">🌸</span>Empieza
+  </a>
   <a href="{{ url_for('community') }}"
      class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-semibold transition
             {% if ep in ('community','post_detail','new_post') %}text-violet-600{% else %}text-[#a1a1aa]{% endif %}">
     <span class="text-xl leading-none">💬</span>Comunidad
-  </a>
-  <a href="{{ url_for('courses') }}"
-     class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-semibold transition
-            {% if nav_formaciones %}text-violet-600{% else %}text-[#a1a1aa]{% endif %}">
-    <span class="text-xl leading-none">📚</span>Formaciones
   </a>
   <a href="{{ url_for('calendar') }}"
      class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-semibold transition
             {% if ep=='calendar' %}text-violet-600{% else %}text-[#a1a1aa]{% endif %}">
     <span class="text-xl leading-none">📅</span>Calendario
   </a>
-  <a href="{{ url_for('leaderboard') }}"
+  <a href="{{ url_for('library.index') }}"
      class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-semibold transition
-            {% if ep=='leaderboard' %}text-violet-600{% else %}text-[#a1a1aa]{% endif %}">
-    <span class="text-xl leading-none">🏆</span>Ranking
+            {% if nav_library %}text-violet-600{% else %}text-[#a1a1aa]{% endif %}">
+    <span class="text-xl leading-none">📚</span>Biblioteca
   </a>
   <a href="{{ url_for('members') }}"
      class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-semibold transition

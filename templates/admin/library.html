@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Admin — Biblioteca{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
+{% block content %}
+{% include 'admin/_nav.html' %}
+<div class="flex items-center justify-between mb-6 page-head">
+  <div class="admin-page-head mb-0">
+    <h1>📚 Biblioteca del Círculo</h1>
+    <p>Grabaciones y contenido extra por mes</p>
+  </div>
+  <a href="{{ url_for('library.admin_new') }}" class="btn btn-primary btn-sm">➕ Nuevo</a>
+</div>
+<div class="rounded-xl overflow-hidden shadow-sm table-scroll" style="background:var(--surface);border:1px solid var(--border)">
+  <table class="w-full text-sm">
+    <thead>
+      <tr style="border-bottom:1px solid var(--border);background:var(--hover-bg)">
+        <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Título</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Mes</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Tipo</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Estado</th>
+        <th class="px-4 py-3 text-right text-xs font-semibold" style="color:var(--text3)">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr style="border-bottom:1px solid var(--border)">
+        <td class="px-4 py-3 font-medium" style="color:var(--text1)">{{ item.title }}</td>
+        <td class="px-4 py-3 text-xs" style="color:var(--text3)">{{ month_names[item.month] }} {{ item.year }}</td>
+        <td class="px-4 py-3 text-xs">{{ item.item_type }}</td>
+        <td class="px-4 py-3 text-xs">{{ 'Publicado' if item.is_published else 'Borrador' }}</td>
+        <td class="px-4 py-3 text-right">
+          <a href="{{ url_for('library.admin_edit', item_id=item.id) }}" class="btn btn-secondary btn-sm">Editar</a>
+          <form method="POST" action="{{ url_for('library.admin_delete', item_id=item.id) }}" class="inline" onsubmit="return confirm('¿Eliminar?')">
+            <button type="submit" class="btn btn-secondary btn-sm" style="color:#ef4444">Borrar</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="px-4 py-8 text-center text-sm" style="color:var(--text4)">Sin elementos.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include 'admin/_nav_footer.html' %}
+{% endblock %}

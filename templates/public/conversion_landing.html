@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>{{ landing_text(site, 'landing_title') }} — {{ site.academy_name or academy_name }}</title>
+<script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/theme.css"/>
+<style>
+  :root {
+    --conv-bg: #faf8f6;
+    --conv-card: #ffffff;
+    --conv-text: #2d2a26;
+    --conv-muted: #6b6560;
+    --conv-accent: var(--color-primary, #7c3aed);
+    --conv-accent-soft: color-mix(in srgb, var(--conv-accent) 10%, white);
+  }
+  body { background: var(--conv-bg); color: var(--conv-text); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; line-height: 1.65; }
+  .conv-accent { color: var(--conv-accent); }
+  .conv-header { background: var(--conv-card); border-bottom: 1px solid #ebe6e1; }
+  .conv-card { background: var(--conv-card); border: 1px solid #ebe6e1; border-radius: 20px; padding: 1.5rem; box-shadow: 0 8px 30px rgba(45,42,38,.06); }
+  .conv-card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; text-align: center; }
+  .conv-pill { display: inline-block; padding: 0.4rem 1rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; border: 1px solid #d4d0cb; background: #fff; color: var(--conv-muted); transition: .15s; }
+  .conv-pill-on { background: var(--conv-accent); color: #fff; border-color: var(--conv-accent); }
+  .conv-plan { border: 2px solid #ebe6e1; border-radius: 14px; padding: 1rem 1.1rem; transition: .15s; }
+  .conv-plan-on { border-color: var(--conv-accent); background: var(--conv-accent-soft); }
+  .conv-btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.85rem 1.5rem; border-radius: 12px; font-weight: 700; font-size: 1rem; border: none; cursor: pointer; background: var(--conv-accent); color: #fff; transition: filter .15s; }
+  .conv-btn:hover { filter: brightness(.95); }
+  .conv-btn-outline { background: transparent; border: 1px solid #d4d0cb; color: var(--conv-text); }
+  .conv-section { margin-bottom: 2.5rem; }
+  .conv-section h2 { font-size: 1.35rem; font-weight: 700; margin-bottom: 1rem; }
+  .conv-hero { font-size: clamp(2rem, 5vw, 2.75rem); font-weight: 800; letter-spacing: .02em; line-height: 1.15; }
+  .conv-prose p { margin-bottom: 0.85rem; color: var(--conv-muted); }
+  .conv-prose p.lead { color: var(--conv-text); font-size: 1.05rem; }
+  .conv-list li { display: flex; gap: 0.5rem; margin-bottom: 0.55rem; color: var(--conv-muted); }
+  .conv-list .ico { flex-shrink: 0; }
+  .conv-check li::before { content: '✔'; color: var(--conv-accent); font-weight: 700; margin-right: 0.35rem; }
+  .conv-check li { list-style: none; display: flex; align-items: flex-start; margin-bottom: 0.5rem; }
+  .conv-closing { text-align: center; padding: 2rem 0; }
+  .conv-closing p { font-size: 1.15rem; font-weight: 600; margin: 0.25rem 0; }
+  .input { background: #fff; border: 1px solid #d4d0cb; border-radius: 10px; padding: 0.7rem 0.9rem; font-size: 0.9rem; width: 100%; outline: none; box-sizing: border-box; }
+  .input:focus { border-color: var(--conv-accent); box-shadow: 0 0 0 3px var(--conv-accent-soft); }
+  @media (min-width: 1024px) {
+    .conv-sidebar { position: sticky; top: 1.25rem; }
+  }
+</style>
+{% if brand_style %}<style>:root{ {{ brand_style }} }</style>{% endif %}
+</head>
+<body>
+
+<header class="conv-header px-4 py-3 flex items-center justify-between max-w-6xl mx-auto">
+  <div class="flex items-center gap-2 font-bold text-sm">
+    {% if site.brand_logo_url %}
+    <img src="{{ site.brand_logo_url }}" alt="" class="h-8"/>
+    {% else %}
+    <span class="text-xl">🤍</span>
+    {% endif %}
+    {{ landing_text(site, 'landing_title') }}
+  </div>
+  <a href="#acceso" class="text-sm font-semibold conv-accent">Ya tengo cuenta</a>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-8 lg:py-12">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="mb-6 space-y-2 max-w-3xl">
+    {% for cat, msg in messages %}
+    <div class="px-4 py-3 rounded-xl text-sm border {% if cat=='error' %}bg-red-50 border-red-200 text-red-700{% else %}bg-green-50 border-green-200 text-green-700{% endif %}">{{ msg }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10 lg:items-start">
+    <article>
+      <section class="conv-section">
+        <h1 class="conv-hero mb-6">{{ landing_text(site, 'landing_title') }}</h1>
+        <div class="conv-prose">
+          {% for p in landing_paragraphs(site, 'landing_hook') %}
+          <p class="{% if loop.index <= 4 %}lead{% endif %}">{{ p }}</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="conv-section conv-prose">
+        {% for p in landing_paragraphs(site, 'landing_intro') %}
+        <p>{{ p }}</p>
+        {% endfor %}
+      </section>
+
+      <section class="conv-section">
+        <h2>¿Qué es {{ landing_text(site, 'landing_title') }}?</h2>
+        <div class="conv-prose">
+          {% for p in landing_paragraphs(site, 'landing_what_is') %}
+          <p>{{ p }}</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <div class="lg:hidden conv-section" id="planes-mobile">
+        {% include 'public/_landing_checkout.html' %}
+      </div>
+
+      <section class="conv-section">
+        <h2>¿Cómo puede ayudarte?</h2>
+        <div class="conv-prose">
+          {% for p in landing_paragraphs(site, 'landing_how_helps') %}
+          <p>{{ p }}</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="conv-section">
+        <h2>Algunas de las preguntas que exploraremos juntas</h2>
+        <ul class="conv-list">
+          {% for line in landing_lines(site, 'landing_explore_questions') %}
+          <li><span class="ico">🤍</span><span>{{ line }}</span></li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      <section class="conv-section">
+        <h2>¿Qué encontrarás dentro?</h2>
+        <ul class="conv-list">
+          {% for line in landing_lines(site, 'landing_includes') %}
+          <li><span class="ico">🤍</span><span>{{ line }}</span></li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      <section class="conv-section conv-prose">
+        {% set closing_parts = landing_paragraphs(site, 'landing_closing') %}
+        {% if closing_parts %}
+        {% for line in closing_parts[0].split('\n') %}
+        <p class="{% if loop.last %}font-semibold{% endif %}">{{ line }}</p>
+        {% endfor %}
+        {% endif %}
+      </section>
+
+      <section class="conv-section">
+        <h2>Este círculo es para ti si…</h2>
+        <ul class="conv-check">
+          {% for line in landing_lines(site, 'landing_for_you') %}
+          <li>{{ line }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      <section class="conv-section conv-closing">
+        {% if closing_parts|length > 1 %}
+        {% for line in closing_parts[1].split('\n') %}
+        <p>{{ line }}</p>
+        {% endfor %}
+        {% endif %}
+      </section>
+    </article>
+
+    <aside class="conv-sidebar space-y-5 hidden lg:block">
+      {% include 'public/_landing_checkout.html' %}
+
+      <div class="conv-card" id="acceso">
+        <h2 class="conv-card-title">{{ landing_text(site, 'landing_login_title') }}</h2>
+        <p class="text-sm text-center mb-4" style="color:var(--conv-muted)">{{ landing_text(site, 'landing_login_subtitle') }}</p>
+        <form method="POST" action="{{ url_for('login') }}" class="space-y-3">
+          {% include 'includes/csrf_field.html' %}
+          <input type="email" name="email" class="input" placeholder="tu@email.com" required autocomplete="email"/>
+          <input type="password" name="password" class="input" placeholder="Contraseña" required autocomplete="current-password"/>
+          <button type="submit" class="conv-btn conv-btn-outline w-full">Iniciar sesión</button>
+        </form>
+      </div>
+    </aside>
+  </div>
+
+  <section class="conv-card max-w-md mx-auto mt-10 lg:hidden" id="acceso">
+    <h2 class="conv-card-title">{{ landing_text(site, 'landing_login_title') }}</h2>
+    <p class="text-sm text-center mb-4" style="color:var(--conv-muted)">{{ landing_text(site, 'landing_login_subtitle') }}</p>
+    <form method="POST" action="{{ url_for('login') }}" class="space-y-3">
+      {% include 'includes/csrf_field.html' %}
+      <input type="email" name="email" class="input" placeholder="tu@email.com" required autocomplete="email"/>
+      <input type="password" name="password" class="input" placeholder="Contraseña" required autocomplete="current-password"/>
+      <button type="submit" class="conv-btn conv-btn-outline w-full">Iniciar sesión</button>
+    </form>
+  </section>
+</main>
+
+<script>
+document.querySelectorAll('.conv-plan').forEach(card => {
+  card.addEventListener('click', () => {
+    const form = card.closest('form');
+    if (!form) return;
+    form.querySelectorAll('.conv-plan').forEach(c => c.classList.remove('conv-plan-on'));
+    card.classList.add('conv-plan-on');
+    card.querySelector('.plan-radio').checked = true;
+  });
+});
+</script>
+</body>
+</html>

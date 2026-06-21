@@ -4,55 +4,27 @@
 
 {% block content %}
 
-<!-- ── Solicitudes pendientes (solo admin) ─────────────────────────────── -->
 {% if current_user.is_admin and pending %}
 <div class="mb-6 rounded-2xl border overflow-hidden"
      style="background:var(--surface);border-color:#fbbf24">
   <div class="flex items-center gap-2 px-5 py-3 border-b" style="border-color:#fef3c7;background:#fffbeb">
     <span class="text-base">🕐</span>
-    <h2 class="text-sm font-bold" style="color:#92400e">
-      Solicitudes de acceso pendientes
-    </h2>
-    <span class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full text-white" style="background:#f59e0b">
-      {{ pending|length }}
-    </span>
+    <h2 class="text-sm font-bold" style="color:#92400e">Solicitudes de acceso pendientes</h2>
+    <span class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full text-white" style="background:#f59e0b">{{ pending|length }}</span>
   </div>
   <div class="divide-y" style="--tw-divide-color:var(--border)">
     {% for u in pending %}
     <div class="flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-5 py-3">
-      <!-- Avatar -->
-      <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-           style="background:#a1a1aa">
-        {% if u.avatar_data %}
-        <img src="{{ url_for('serve_avatar', user_id=u.id) }}" class="w-full h-full object-cover rounded-full"/>
-        {% else %}{{ u.initials }}{% endif %}
+      <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style="background:#a1a1aa">
+        {% if u.avatar_data %}<img src="{{ url_for('serve_avatar', user_id=u.id) }}" class="w-full h-full object-cover rounded-full"/>{% else %}{{ u.initials }}{% endif %}
       </div>
-      <!-- Info -->
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-semibold leading-tight" style="color:var(--text1)">{{ u.username }}</p>
+        <p class="text-sm font-semibold" style="color:var(--text1)">{{ u.username }}</p>
         <p class="text-xs" style="color:var(--text4)">{{ u.email }}{% if u.city %} · 📍 {{ u.city }}{% endif %}</p>
-        {% if u.bio %}
-        <p class="text-xs mt-0.5" style="color:var(--text3)">«{{ u.bio[:80] }}{% if u.bio|length > 80 %}…{% endif %}»</p>
-        {% endif %}
-        <p class="text-[10px]" style="color:var(--text4)">Solicitó acceso {{ u.created_at.strftime('%d/%m/%Y · %H:%M') }}</p>
       </div>
-      <!-- Acciones -->
-      <div class="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto">
-        <form method="POST" action="{{ url_for('members_approve', user_id=u.id) }}" class="flex-1 sm:flex-none">
-          <button type="submit"
-                  class="px-3 py-1.5 rounded-lg text-xs font-bold text-white transition"
-                  style="background:#059669">
-            ✓ Aprobar
-          </button>
-        </form>
-        <form method="POST" action="{{ url_for('members_reject', user_id=u.id) }}"
-              onsubmit="return confirm('¿Rechazar a {{ u.username }}?')">
-          <button type="submit"
-                  class="px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                  style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca">
-            ✕ Rechazar
-          </button>
-        </form>
+      <div class="flex gap-2">
+        <form method="POST" action="{{ url_for('members_approve', user_id=u.id) }}"><button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style="background:#059669">✓ Aprobar</button></form>
+        <form method="POST" action="{{ url_for('members_reject', user_id=u.id) }}" onsubmit="return confirm('¿Rechazar?')"><button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-bold" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca">✕</button></form>
       </div>
     </div>
     {% endfor %}
@@ -60,117 +32,42 @@
 </div>
 {% endif %}
 
-<div class="flex items-center justify-between mb-6">
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
   <div>
     <h1 class="text-xl font-bold" style="color:var(--text1)">👥 Miembros</h1>
-    <p class="text-sm mt-0.5" style="color:var(--text4)">{{ members|length }} persona{{ 's' if members|length != 1 else '' }} en la comunidad</p>
+    <p class="text-sm mt-0.5" style="color:var(--text4)">{{ members|length }} en la comunidad</p>
   </div>
-  <input id="search" type="text" placeholder="🔍 Buscar miembro…"
-         class="input text-sm" style="max-width:220px;padding:8px 14px"
-         oninput="filterMembers(this.value)"/>
+  <input id="search" type="text" placeholder="🔍 Buscar…" class="input text-sm" style="max-width:220px;padding:8px 14px" oninput="filterMembers(this.value)"/>
 </div>
-
-{% with messages = get_flashed_messages(with_categories=true) %}
-{% if messages %}{% for cat, msg in messages %}
-<div class="mb-4 px-4 py-3 rounded-lg text-sm border
-  {% if cat=='error' %}bg-red-50 border-red-200 text-red-700{% else %}bg-green-50 border-green-200 text-green-700{% endif %}">
-  {{ msg }}
-</div>
-{% endfor %}{% endif %}
-{% endwith %}
 
 <div id="members-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-
   {% for m in members %}
   {% set member = m.user %}
-  {% set lvl    = m.level %}
   <div class="member-card flex flex-col items-center text-center rounded-2xl p-4 shadow-sm transition hover:shadow-md"
        style="background:var(--surface);border:1px solid var(--border)"
        data-name="{{ member.username|lower }}">
-
-    <!-- Avatar con anillo del color del nivel -->
-    <div class="relative mb-3">
-      <div class="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center text-white text-xl font-bold"
-           style="background:{% if member.is_admin %}#7c3aed{% else %}#a1a1aa{% endif %};
-                  outline:3px solid {{ lvl.color }};outline-offset:2px">
-        {% if member.avatar_data %}
-        <img src="{{ url_for('serve_avatar', user_id=member.id) }}" class="w-full h-full object-cover"/>
-        {% else %}{{ member.initials }}{% endif %}
-      </div>
-      <!-- Número de nivel encima del avatar -->
-      <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center
-                  text-[10px] font-black text-white shadow"
-           style="background:{{ lvl.color }}">{{ lvl.num }}</div>
+    <div class="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center text-white text-xl font-bold mb-3"
+         style="background:{% if member.is_admin %}#7c3aed{% else %}#a1a1aa{% endif %}">
+      {% if member.avatar_data %}<img src="{{ url_for('serve_avatar', user_id=member.id) }}" class="w-full h-full object-cover"/>{% else %}{{ member.initials }}{% endif %}
     </div>
-
-    <!-- Nombre -->
-    <p class="font-semibold text-sm leading-tight mb-1" style="color:var(--text1)">
-      {{ member.username }}
-      {% if member.id == current_user.id %}
-      <span class="block text-[10px] font-normal" style="color:var(--text4)">tú</span>
-      {% endif %}
-    </p>
-
-    <!-- Badge rol -->
-    <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold mb-1
-      {% if member.is_admin %}bg-violet-100 text-violet-700{% else %}bg-zinc-100 text-zinc-500{% endif %}">
-      {{ '⚙️ Admin' if member.is_admin else '🎓 Alumno' }}
-    </span>
-
-    <!-- Badge nivel -->
-    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold mb-2 text-white"
-          style="background:{{ lvl.color }}">
-      {{ lvl.emoji }} {{ lvl.name }}
-    </span>
-
-    <!-- Puntos totales -->
-    <p class="text-[10px] font-semibold mb-1" style="color:var(--text4)">
-      {{ m.pts }} pts
-    </p>
-
-    <!-- Fecha entrada -->
-    <p class="text-[10px] mb-3" style="color:var(--text4)">
-      Desde {{ member.created_at.strftime('%d/%m/%Y') }}
-    </p>
-
-    <!-- Botón actividad: admin ve todos, alumno solo el suyo -->
-    {% if current_user.is_admin or member.id == current_user.id %}
-    <a href="{{ url_for('member_activity', user_id=member.id) }}"
-       class="w-full btn btn-secondary btn-sm justify-center mb-2" style="font-size:11px;">
-      ⚡ Actividad
-    </a>
-    {% endif %}
-
-    <!-- Acciones admin -->
+    <p class="font-semibold text-sm" style="color:var(--text1)">{{ member.username }}{% if member.id == current_user.id %}<span class="block text-[10px] font-normal" style="color:var(--text4)">tú</span>{% endif %}</p>
+    {% if member.city %}<p class="text-[11px] mt-1" style="color:var(--text3)">📍 {{ member.city }}</p>{% endif %}
+    {% if member.bio %}<p class="text-[10px] mt-1 leading-snug px-1" style="color:var(--text4)">«{{ member.bio[:60] }}{% if member.bio|length > 60 %}…{% endif %}»</p>{% endif %}
+    <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold mt-2 {% if member.is_admin %}bg-violet-100 text-violet-700{% else %}bg-zinc-100 text-zinc-500{% endif %}">{{ '⚙️ Admin' if member.is_admin else '💜 Miembro' }}</span>
+    <p class="text-[10px] mt-2" style="color:var(--text4)">Desde {{ member.created_at.strftime('%d/%m/%Y') }}</p>
     {% if current_user.is_admin and member.id != current_user.id %}
-    <div class="w-full space-y-1.5 border-t pt-3 mt-auto" style="border-color:var(--border)">
-      <form method="POST" action="{{ url_for('members_toggle_role', user_id=member.id) }}"
-            onsubmit="return confirm('¿{{ 'Quitar admin a' if member.is_admin else 'Hacer admin a' }} {{ member.username }}?')">
-        <button type="submit" class="w-full btn btn-secondary btn-sm justify-center" style="font-size:11px;">
-          {{ '⬇ Quitar admin' if member.is_admin else '⬆ Hacer admin' }}
-        </button>
+    <div class="w-full space-y-1.5 border-t pt-3 mt-3" style="border-color:var(--border)">
+      <form method="POST" action="{{ url_for('members_toggle_role', user_id=member.id) }}" onsubmit="return confirm('¿Cambiar rol?')">
+        <button type="submit" class="w-full btn btn-secondary btn-sm justify-center" style="font-size:11px">{{ '⬇ Quitar admin' if member.is_admin else '⬆ Hacer admin' }}</button>
       </form>
-      <form method="POST" action="{{ url_for('members_suspend', user_id=member.id) }}"
-            onsubmit="return confirm('¿Expulsar a {{ member.username }}? Perderá el acceso a la plataforma.')">
-        <button type="submit" class="w-full btn btn-sm justify-center"
-                style="font-size:11px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;">
-          🚫 Expulsar
-        </button>
+      <form method="POST" action="{{ url_for('members_suspend', user_id=member.id) }}" onsubmit="return confirm('¿Expulsar?')">
+        <button type="submit" class="w-full btn btn-sm justify-center" style="font-size:11px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca">🚫 Expulsar</button>
       </form>
     </div>
     {% endif %}
-
   </div>
   {% endfor %}
-
 </div>
-
-{% if not members %}
-<div class="text-center py-20">
-  <p class="text-4xl mb-3">👥</p>
-  <p class="text-sm" style="color:var(--text4)">Aún no hay miembros.</p>
-</div>
-{% endif %}
 
 <script>
 function filterMembers(q) {
@@ -180,5 +77,4 @@ function filterMembers(q) {
   });
 }
 </script>
-
 {% endblock %}

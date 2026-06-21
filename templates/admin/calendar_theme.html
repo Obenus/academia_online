@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Temática mensual{% endblock %}
+{% block content_class %}max-w-lg mx-auto{% endblock %}
+{% block content %}
+<a href="{{ url_for('admin_live_classes') }}" class="text-sm" style="color:var(--text3)">← Calendario admin</a>
+<h1 class="text-xl font-bold my-4" style="color:var(--text1)">📅 Temática del mes</h1>
+<form method="POST" class="rounded-xl p-6 space-y-4 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+  <div class="grid grid-cols-2 gap-3">
+    <div><label class="block text-xs mb-1" style="color:var(--text3)">Año</label>
+      <input type="number" name="year" class="input" value="{{ year }}" min="2020" max="2035"/></div>
+    <div><label class="block text-xs mb-1" style="color:var(--text3)">Mes</label>
+      <select name="month" class="input">
+        {% for i in range(1,13) %}
+        <option value="{{ i }}" {% if month==i %}selected{% endif %}>{{ month_names[i] }}</option>
+        {% endfor %}
+      </select></div>
+  </div>
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">Título de la temática *</label>
+    <input type="text" name="theme_title" class="input" value="{{ theme.theme_title if theme else '' }}" required placeholder="Ej: Autocuidado y límites"/></div>
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">Descripción</label>
+    <textarea name="description" class="input" rows="4" placeholder="De qué trata este mes en los encuentros...">{{ theme.description if theme else '' }}</textarea></div>
+  <button type="submit" class="btn btn-primary w-full justify-center">Guardar temática</button>
+</form>
+{% endblock %}

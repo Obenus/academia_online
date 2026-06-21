@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
 {% block title %}Ajustes de comunidad{% endblock %}
-{% block content_class %}max-w-2xl mx-auto{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
 
 {% block content %}
-<div class="flex items-center gap-3 mb-6">
-  <a href="{{ url_for('admin_dashboard') }}" class="text-sm" style="color:var(--text3)">← Admin</a>
-  <h1 class="text-xl font-bold" style="color:var(--text1)">⚙️ Ajustes de comunidad</h1>
+{% include 'admin/_nav.html' %}
+<div class="admin-page-head">
+  <h1>⚙️ Ajustes de la comunidad</h1>
+  <p>Marca, landing, emails, miembro del mes y alertas de facturación</p>
 </div>
 
 <div class="rounded-xl p-6 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
@@ -50,7 +51,7 @@
     <p class="text-xs mb-3" style="color:var(--text4)">Plantillas HTML con variables <code>{{nombre}}</code>. Requiere SMTP (MAIL_* en Docker). Los recordatorios de eventos los envía el servicio <code>reminder</code> (24 h y 1 h antes).</p>
 
     <h3 class="text-sm font-semibold" style="color:var(--text1)">Bienvenida (usuario)</h3>
-    <p class="text-[11px] mb-2" style="color:var(--text4)">Variables: {% raw %}<code>{{username}}</code>, <code>{{email}}</code>, <code>{{plan_name}}</code>, <code>{{academy_name}}</code>, <code>{{login_url}}</code>, <code>{{approval_note}}</code>{% endraw %}</p>
+    <p class="text-[11px] mb-2" style="color:var(--text4)">Variables: {% raw %}<code>{{username}}</code>, <code>{{email}}</code>, <code>{{password}}</code>, <code>{{plan_name}}</code>, <code>{{academy_name}}</code>, <code>{{login_url}}</code>, <code>{{welcome_video_block}}</code>{% endraw %}</p>
     <input type="text" name="welcome_email_subject" class="input mb-2"
            value="{{ s.welcome_email_subject or default_welcome_subject }}" placeholder="Asunto"/>
     <textarea name="welcome_email_body" class="input" rows="7">{{ s.welcome_email_body or default_welcome_body }}</textarea>
@@ -84,7 +85,137 @@
            value="{{ s.event_reminder_email_subject or default_event_reminder_subject }}" placeholder="Asunto"/>
     <textarea name="event_reminder_email_body" class="input" rows="8">{{ s.event_reminder_email_body or default_event_reminder_body }}</textarea>
 
+    <hr style="border-color:var(--border)"/>
+    <h2 class="text-lg font-semibold" style="color:var(--text1)">🌸 Landing y Empieza por aquí</h2>
+    <p class="text-sm mb-3" style="color:var(--text3)">
+      Los textos de la página de acceso y suscripción están en
+      <a href="{{ url_for('admin_landing') }}" class="text-violet-600 font-semibold">Landing principal</a>.
+    </p>
+    <input type="url" name="welcome_video_url" class="input mb-2" value="{{ s.welcome_video_url or '' }}" placeholder="URL vídeo bienvenida (Vimeo/YouTube)"/>
+    <input type="url" name="how_it_works_video_url" class="input mb-2" value="{{ s.how_it_works_video_url or '' }}" placeholder="URL vídeo cómo funciona"/>
+    <textarea name="start_page_intro" class="input mb-2" rows="2" placeholder="Texto intro Empieza por aquí">{{ s.start_page_intro or '' }}</textarea>
+    <input type="url" name="whatsapp_url" class="input mb-2" value="{{ s.whatsapp_url or '' }}" placeholder="Enlace grupo WhatsApp"/>
+
+    <h3 class="text-sm font-semibold mt-4" style="color:var(--text1)">⭐ Miembro del mes</h3>
+    <select name="member_of_month_user_id" class="input mb-2">
+      <option value="">— Ninguno —</option>
+      {% for u in active_users %}
+      <option value="{{ u.id }}" {% if s.member_of_month_user_id==u.id %}selected{% endif %}>{{ u.username }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" name="member_of_month_note" class="input mb-2" value="{{ s.member_of_month_note or '' }}" placeholder="Nota breve"/>
+    <input type="text" name="member_of_month_month" class="input mb-2" value="{{ s.member_of_month_month or '' }}" placeholder="Mes (YYYY-MM)"/>
+
+    <hr style="border-color:var(--border)"/>
+    <h2 class="text-lg font-semibold" style="color:var(--text1)">🎨 Marca</h2>
+    <input type="url" name="brand_logo_url" class="input mb-2" value="{{ s.brand_logo_url or '' }}" placeholder="URL del logo"/>
+    <div class="grid grid-cols-2 gap-3 mb-2">
+      <input type="text" name="color_primary" class="input" value="{{ s.color_primary or '#7c3aed' }}" placeholder="Color primario"/>
+      <input type="text" name="color_secondary" class="input" value="{{ s.color_secondary or '#6d28d9' }}" placeholder="Color secundario"/>
+    </div>
+    <input type="text" name="font_family" class="input mb-2" value="{{ s.font_family or '' }}" placeholder="Fuente (opcional)"/>
+
+    <h3 class="text-sm font-semibold mt-4" style="color:var(--text1)">▶ Barra del reproductor (Biblioteca)</h3>
+    <p class="text-[11px] mb-3" style="color:var(--text4)">Colores de la barra de controles del vídeo en la biblioteca. El acento vacío usa el color primario de marca.</p>
+  {% set pbg = s.player_bar_bg or '#141414' %}
+  {% set paccent = s.player_bar_accent or s.color_primary or '#7c3aed' %}
+  {% set ptext = s.player_bar_text or '#bfbfbf' %}
+  {% set pbtn = s.player_bar_btn or '#2a2a2a' %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
+      <label class="block text-xs font-medium" style="color:var(--text3)">
+        Fondo de la barra
+        <div class="flex items-center gap-2 mt-1">
+          <input type="color" data-sync="player_bar_bg" value="{{ pbg }}" class="h-10 w-14 rounded border cursor-pointer" style="border-color:var(--border)"/>
+          <input type="text" name="player_bar_bg" class="input flex-1 player-hex" data-sync="player_bar_bg" value="{{ pbg }}" maxlength="7" placeholder="#141414"/>
+        </div>
+      </label>
+      <label class="block text-xs font-medium" style="color:var(--text3)">
+        Color de acento (progreso)
+        <div class="flex items-center gap-2 mt-1">
+          <input type="color" data-sync="player_bar_accent" value="{{ paccent }}" class="h-10 w-14 rounded border cursor-pointer" style="border-color:var(--border)"/>
+          <input type="text" name="player_bar_accent" class="input flex-1 player-hex" data-sync="player_bar_accent" value="{{ s.player_bar_accent or '' }}" maxlength="7" placeholder="Vacío = primario"/>
+        </div>
+      </label>
+      <label class="block text-xs font-medium" style="color:var(--text3)">
+        Color del texto (tiempo)
+        <div class="flex items-center gap-2 mt-1">
+          <input type="color" data-sync="player_bar_text" value="{{ ptext }}" class="h-10 w-14 rounded border cursor-pointer" style="border-color:var(--border)"/>
+          <input type="text" name="player_bar_text" class="input flex-1 player-hex" data-sync="player_bar_text" value="{{ ptext }}" maxlength="7"/>
+        </div>
+      </label>
+      <label class="block text-xs font-medium" style="color:var(--text3)">
+        Fondo de botones
+        <div class="flex items-center gap-2 mt-1">
+          <input type="color" data-sync="player_bar_btn" value="{{ pbtn }}" class="h-10 w-14 rounded border cursor-pointer" style="border-color:var(--border)"/>
+          <input type="text" name="player_bar_btn" class="input flex-1 player-hex" data-sync="player_bar_btn" value="{{ pbtn }}" maxlength="7"/>
+        </div>
+      </label>
+    </div>
+    <div id="player-bar-preview" class="rounded-xl overflow-hidden mb-2 ring-1" style="border-color:var(--border);max-width:420px">
+      <div class="h-20 flex items-center justify-center text-xs" style="background:#000;color:#666">Vídeo</div>
+      <div class="px-3 py-2" id="player-bar-preview-bar" style="background:{{ pbg }};border-top:1px solid rgba(255,255,255,.08)">
+        <div class="h-1 rounded mb-2" id="player-bar-preview-accent" style="background:linear-gradient(90deg, {{ paccent }} 45%, rgba(255,255,255,.2) 45%)"></div>
+        <div class="flex items-center gap-2">
+          <span class="w-7 h-7 rounded-md inline-block" id="player-bar-preview-btn" style="background:{{ pbtn }}"></span>
+          <span class="text-[11px]" id="player-bar-preview-text" style="color:{{ ptext }}">1:24 / 7:53</span>
+        </div>
+      </div>
+    </div>
+
+    <hr style="border-color:var(--border)"/>
+    <h3 class="text-sm font-semibold" style="color:var(--text1)">Alertas de facturación (admin)</h3>
+    <p class="text-[11px] mb-2" style="color:var(--text4)">Variables: {% raw %}<code>{{username}}</code>, <code>{{email}}</code>, <code>{{reason}}</code>, <code>{{fecha}}</code>, <code>{{plan_name}}</code>{% endraw %}</p>
+    <input type="text" name="billing_alert_email_subject" class="input mb-2"
+           value="{{ s.billing_alert_email_subject or default_billing_alert_subject }}"/>
+    <textarea name="billing_alert_email_body" class="input" rows="6">{{ s.billing_alert_email_body or default_billing_alert_body }}</textarea>
+
     <button type="submit" class="btn btn-primary w-full justify-center">Guardar ajustes</button>
   </form>
 </div>
+<script>
+(function() {
+  const preview = {
+    bar: document.getElementById('player-bar-preview-bar'),
+    accent: document.getElementById('player-bar-preview-accent'),
+    btn: document.getElementById('player-bar-preview-btn'),
+    text: document.getElementById('player-bar-preview-text'),
+  };
+  function field(name) {
+    return document.querySelector('input[name="' + name + '"]');
+  }
+  function colorPicker(name) {
+    return document.querySelector('input[type=color][data-sync="' + name + '"]');
+  }
+  function validHex(v) {
+    return /^#[0-9a-fA-F]{6}$/.test(v || '');
+  }
+  function updatePreview() {
+    const bg = field('player_bar_bg')?.value || '#141414';
+    const accent = field('player_bar_accent')?.value || colorPicker('player_bar_accent')?.value || '#7c3aed';
+    const text = field('player_bar_text')?.value || '#bfbfbf';
+    const btn = field('player_bar_btn')?.value || '#2a2a2a';
+    if (preview.bar) preview.bar.style.background = validHex(bg) ? bg : '#141414';
+    if (preview.accent) preview.accent.style.background = 'linear-gradient(90deg, ' + (validHex(accent) ? accent : '#7c3aed') + ' 45%, rgba(255,255,255,.2) 45%)';
+    if (preview.btn) preview.btn.style.background = validHex(btn) ? btn : '#2a2a2a';
+    if (preview.text) preview.text.style.color = validHex(text) ? text : '#bfbfbf';
+  }
+  document.querySelectorAll('input[type=color][data-sync]').forEach(picker => {
+    picker.addEventListener('input', () => {
+      const text = field(picker.dataset.sync);
+      if (text) text.value = picker.value;
+      updatePreview();
+    });
+  });
+  document.querySelectorAll('.player-hex').forEach(text => {
+    const onChange = () => {
+      const picker = colorPicker(text.dataset.sync);
+      if (picker && validHex(text.value)) picker.value = text.value;
+      updatePreview();
+    };
+    text.addEventListener('input', onChange);
+    text.addEventListener('blur', onChange);
+  });
+})();
+</script>
+{% include 'admin/_nav_footer.html' %}
 {% endblock %}

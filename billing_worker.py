@@ -19,6 +19,7 @@ def get_secret(name: str) -> str:
 
 
 def run_cycle(conn):
+    suspended_ids = []
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("""
             SELECT id, username, email, subscription_status, subscription_period_end,
@@ -36,11 +37,14 @@ def run_cycle(conn):
                 """
                 UPDATE "user"
                 SET status = 'suspended',
-                    subscription_status = 'past_due'
+                    subscription_status = 'past_due',
+                    whatsapp_vip_pending = TRUE
                 WHERE id = %s AND status = 'active'
                 """,
                 (u['id'],),
             )
+            if cur.rowcount:
+                suspended_ids.append(u['id'])
             cur.execute("""
                 INSERT INTO notification (user_id, type, message, link, is_read, created_at)
                 SELECT id, 'payment_failed',
@@ -49,8 +53,31 @@ def run_cycle(conn):
             """, (f"⚠️ {u['username']} no ha abonado la mensualidad. Cuenta suspendida.",))
             print(f"[billing-worker] Suspendido user_id={u['id']} ({u['username']})")
         conn.commit()
-        if overdue:
-            print(f"[billing-worker] Procesados {len(overdue)} usuario(s) en mora.")
+
+    if suspended_ids:
+        try:
+            from app import app, mail
+            from models import db, User, Notification
+            from billing import notify_admins_payment_failed
+
+            def _notify(admin_id, ntype, message, link):
+                db.session.add(Notification(
+                    user_id=admin_id, type=ntype, message=message, link=link,
+                ))
+
+            with app.app_context():
+                for uid in suspended_ids:
+                    user = User.query.get(uid)
+                    if user:
+                        notify_admins_payment_failed(
+                            db, _notify, user, 'morosidad (periodo vencido)',
+                            app=app, mail=mail,
+                        )
+                db.session.commit()
+        except Exception as e:
+            print(f'[billing-worker] Email admin: {e}')
+
+        print(f"[billing-worker] Procesados {len(overdue)} usuario(s) en mora.")
 
 
 def main():

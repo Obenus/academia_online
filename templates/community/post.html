@@ -27,7 +27,24 @@
             {{ post.category.emoji }} {{ post.category.name }}
           </span>
           {% endif %}
+          {% if post.workflow_status %}
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full workflow-{{ post.workflow_status }}">
+            {% if post.workflow_status=='pendiente' %}Pendiente{% elif post.workflow_status=='respondida' %}Respondida{% elif post.workflow_status=='importante' %}Importante{% else %}Idea contenido{% endif %}
+          </span>
+          {% endif %}
         </div>
+        {% if current_user.is_admin and post.workflow_status is not none %}
+        <form method="POST" action="{{ url_for('admin_post_workflow_status', post_id=post.id) }}" class="flex flex-wrap items-center gap-2 mb-2">
+          <span class="text-xs" style="color:var(--text4)">Estado:</span>
+          <select name="workflow_status" class="input text-xs" style="width:auto;padding:4px 8px">
+            <option value="pendiente" {% if post.workflow_status=='pendiente' %}selected{% endif %}>Pendiente</option>
+            <option value="respondida" {% if post.workflow_status=='respondida' %}selected{% endif %}>Respondida</option>
+            <option value="importante" {% if post.workflow_status=='importante' %}selected{% endif %}>Importante</option>
+            <option value="idea_contenido" {% if post.workflow_status=='idea_contenido' %}selected{% endif %}>Idea contenido</option>
+          </select>
+          <button type="submit" class="btn btn-secondary btn-sm">Actualizar</button>
+        </form>
+        {% endif %}
         <h1 class="text-lg font-bold text-[#18181b] mb-1" id="post-title-display">{{ post.title }}</h1>
         <div class="text-[#52525b] text-sm leading-relaxed whitespace-pre-wrap" id="post-content-display">{{ post.content }}</div>
         {% if not post.is_hidden %}

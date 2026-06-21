@@ -1,14 +1,15 @@
 {% extends 'base.html' %}
 {% block title %}Planes de suscripción{% endblock %}
-{% block content_class %}max-w-3xl mx-auto{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-  <div class="flex items-center gap-3">
-    <a href="{{ url_for('admin_dashboard') }}" class="text-sm" style="color:var(--text3)">← Admin</a>
-    <h1 class="text-xl font-bold" style="color:var(--text1)">📋 Planes y precios</h1>
+{% include 'admin/_nav.html' %}
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3 page-head">
+  <div class="admin-page-head mb-0">
+    <h1>📋 Planes y precios</h1>
+    <p>Precios España e Internacional por plan</p>
   </div>
-  <a href="{{ url_for('admin_payments') }}" class="btn btn-secondary btn-sm">Configuración Stripe</a>
+  <a href="{{ url_for('admin_payments') }}" class="btn btn-secondary btn-sm">💳 Stripe</a>
 </div>
 
 <div class="rounded-xl p-6 shadow-sm mb-6" style="background:var(--surface);border:1px solid var(--border)">
@@ -31,7 +32,15 @@
             <input type="text" name="plan_name" class="input" value="{{ p.name }}" required/>
           </div>
           <div>
-            <label class="block text-xs mb-1" style="color:var(--text3)">Precio mensual (€)</label>
+            <label class="block text-xs mb-1" style="color:var(--text3)">Precio mensual ES (€)</label>
+            <input type="text" name="plan_price_es" class="input" value="{{ '%.2f'|format(p.price_monthly_es) }}" required/>
+          </div>
+          <div>
+            <label class="block text-xs mb-1" style="color:var(--text3)">Precio mensual INTL (€)</label>
+            <input type="text" name="plan_price_intl" class="input" value="{{ '%.2f'|format(p.price_monthly_intl) }}" required/>
+          </div>
+          <div>
+            <label class="block text-xs mb-1" style="color:var(--text3)">Precio mensual legacy (€)</label>
             <input type="text" name="plan_price" class="input" value="{{ '%.2f'|format(p.price_monthly) }}" required/>
           </div>
           <div>
@@ -40,7 +49,9 @@
           </div>
         </div>
         <div class="grid sm:grid-cols-2 gap-3">
-          <input type="text" name="plan_stripe_price_id" class="input" value="{{ p.stripe_price_id or '' }}" placeholder="Stripe Price ID mensual"/>
+          <input type="text" name="plan_stripe_price_id_es" class="input" value="{{ p.stripe_price_id_es or '' }}" placeholder="Stripe Price ID ES"/>
+          <input type="text" name="plan_stripe_price_id_intl" class="input" value="{{ p.stripe_price_id_intl or '' }}" placeholder="Stripe Price ID INTL"/>
+          <input type="text" name="plan_stripe_price_id" class="input" value="{{ p.stripe_price_id or '' }}" placeholder="Stripe Price ID legacy"/>
           <input type="text" name="plan_stripe_price_id_yearly" class="input" value="{{ p.stripe_price_id_yearly or '' }}" placeholder="Stripe Price ID anual"/>
         </div>
         <div class="grid sm:grid-cols-2 gap-3">
@@ -79,10 +90,14 @@
     <input type="hidden" name="action" value="add_plan"/>
     <div class="grid sm:grid-cols-2 gap-3">
       <input type="text" name="plan_name" class="input" placeholder="Nombre del plan *" required/>
-      <input type="text" name="plan_price" class="input" placeholder="Precio mensual (€) *" required/>
+      <input type="text" name="plan_price_es" class="input" placeholder="Precio mensual ES (€) *" required/>
+      <input type="text" name="plan_price_intl" class="input" placeholder="Precio mensual INTL (€) *" required/>
+      <input type="text" name="plan_price" class="input" placeholder="Precio legacy (€)"/>
       <input type="text" name="plan_price_yearly" class="input" placeholder="Precio anual (€)"/>
     </div>
-    <input type="text" name="plan_stripe_price_id" class="input" placeholder="Stripe Price ID mensual"/>
+    <input type="text" name="plan_stripe_price_id_es" class="input" placeholder="Stripe Price ID ES"/>
+    <input type="text" name="plan_stripe_price_id_intl" class="input" placeholder="Stripe Price ID INTL"/>
+    <input type="text" name="plan_stripe_price_id" class="input" placeholder="Stripe Price ID legacy"/>
     <input type="text" name="plan_stripe_price_id_yearly" class="input" placeholder="Stripe Price ID anual"/>
     <input type="number" name="trial_days" class="input" placeholder="Días prueba gratis" min="0" value="0"/>
     <input type="text" name="stripe_coupon_id" class="input" placeholder="Cupón Stripe por defecto (opcional)"/>
@@ -90,4 +105,5 @@
     <button type="submit" class="btn btn-primary">Crear plan</button>
   </form>
 </div>
+{% include 'admin/_nav_footer.html' %}
 {% endblock %}

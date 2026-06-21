@@ -27,6 +27,10 @@
         <textarea name="description" class="input" rows="3">{{ lc.description }}</textarea>
       </div>
       <div>
+        <label class="block text-sm font-medium text-[#52525b] mb-1.5">Subtema del encuentro</label>
+        <input type="text" name="subtopic" class="input" value="{{ lc.subtopic or '' }}" placeholder="Ej: Límites en el trabajo"/>
+      </div>
+      <div>
         <label class="block text-sm font-medium text-[#52525b] mb-1.5">Fecha y hora *</label>
         <input type="datetime-local" name="scheduled_at" class="input" value="{{ scheduled_str }}" required/>
       </div>

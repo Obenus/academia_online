@@ -1,10 +1,14 @@
 {% extends 'base.html' %}
 {% block title %}Gestionar formaciones{% endblock %}
-{% block content_class %}max-w-4xl mx-auto{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-6 flex-wrap gap-3 page-head">
-  <h1 class="text-xl font-bold text-[#18181b]">📝 Gestionar formaciones</h1>
+{% include 'admin/_nav.html' %}
+<div class="admin-page-head">
+  <h1>📝 Gestionar formaciones</h1>
+  <p>Cursos legacy (contenido migrado a Biblioteca)</p>
+</div>
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
   <div class="flex items-center gap-2">
     <form method="POST" action="{{ url_for('admin_purge_duplicate_fase5') }}"
           onsubmit="return confirm('¿Eliminar FASE 5 duplicadas? Se conservará la que tenga más secciones.')">
@@ -58,4 +62,5 @@
   <a href="{{ url_for('admin_new_course') }}" class="btn btn-primary mt-4 inline-flex">Crear primer curso</a>
 </div>
 {% endif %}
+{% include 'admin/_nav_footer.html' %}
 {% endblock %}

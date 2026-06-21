@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Editar' if item else 'Nuevo' }} recurso{% endblock %}
+{% block content_class %}max-w-lg mx-auto{% endblock %}
+{% block content %}
+<a href="{{ url_for('resources.admin_list') }}" class="text-sm" style="color:var(--text3)">← Recursos</a>
+<h1 class="text-xl font-bold my-4" style="color:var(--text1)">{{ 'Editar recurso' if item else 'Nuevo recurso' }}</h1>
+<form method="POST" enctype="multipart/form-data" class="rounded-xl p-6 space-y-4 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">Título *</label>
+    <input type="text" name="title" class="input" value="{{ item.title if item else '' }}" required/></div>
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">Descripción</label>
+    <textarea name="description" class="input" rows="3">{{ item.description if item else '' }}</textarea></div>
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">Tipo</label>
+    <select name="media_type" class="input">
+      {% for t in ['pdf','audio','video','checklist'] %}
+      <option value="{{ t }}" {% if item and item.media_type==t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select></div>
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">URL externa (opcional)</label>
+    <input type="url" name="file_url" class="input" value="{{ item.file_url if item else '' }}"/></div>
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">Archivo</label>
+    <input type="file" name="file" class="input" style="padding:8px"/></div>
+  <div><label class="block text-xs mb-1" style="color:var(--text3)">Etiquetas (separadas por espacio)</label>
+    <input type="text" name="tags" class="input" value="{{ tag_str if tag_str is defined else '' }}" placeholder="mindfulness pdf guía"/></div>
+  <button type="submit" class="btn btn-primary w-full justify-center">Guardar</button>
+</form>
+{% endblock %}

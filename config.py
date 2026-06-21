@@ -42,6 +42,10 @@ MAX_CONTENT_LENGTH = 16 * 1024 * 1024
 
 ACADEMY_NAME = os.environ.get('ACADEMY_NAME', 'Marca Atractora')
 PUBLIC_BASE_URL = os.environ.get('PUBLIC_BASE_URL', '').strip().rstrip('/')
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '').strip()
+N8N_WEBHOOK_PREGUNTAS = os.environ.get('N8N_WEBHOOK_PREGUNTAS', '').strip()
+RECORDING_WEBHOOK_SECRET = os.environ.get('RECORDING_WEBHOOK_SECRET', '').strip()
+DEFAULT_BILLING_REGION = os.environ.get('DEFAULT_BILLING_REGION', 'es').strip().lower()
 
 # Email (configurar en Railway con variables de entorno)
 MAIL_SERVER   = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')

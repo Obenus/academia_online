@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
 {% block title %}Backups{% endblock %}
-{% block content_class %}max-w-2xl mx-auto{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
 
 {% block content %}
-<div class="flex items-center gap-3 mb-6">
-  <a href="{{ url_for('admin_dashboard') }}" class="text-sm" style="color:var(--text3)">← Admin</a>
-  <h1 class="text-xl font-bold" style="color:var(--text1)">💾 Backups</h1>
+{% include 'admin/_nav.html' %}
+<div class="admin-page-head">
+  <h1>💾 Backups</h1>
+  <p>Copias automáticas y restauración de la base de datos</p>
 </div>
 
 <div class="rounded-xl p-6 shadow-sm mb-6" style="background:var(--surface);border:1px solid var(--border)">
@@ -131,4 +132,5 @@
     </ol>
   </div>
 </div>
+{% include 'admin/_nav_footer.html' %}
 {% endblock %}

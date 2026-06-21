@@ -1,0 +1,29 @@
+/* Identidad de marca — sobrescribir desde SiteSettings vía inline style en base.html */
+:root {
+  --brand-primary: var(--color-primary, #7c3aed);
+  --brand-secondary: var(--color-secondary, #6d28d9);
+  --font-display: var(--font-family-display, 'Segoe UI', system-ui, sans-serif);
+  --font-body: var(--font-family-body, 'Segoe UI', system-ui, sans-serif);
+}
+
+body {
+  font-family: var(--font-body);
+}
+
+.btn-primary,
+.bg-brand {
+  background: var(--brand-primary) !important;
+}
+
+.text-brand {
+  color: var(--brand-primary) !important;
+}
+
+.border-brand {
+  border-color: var(--brand-primary) !important;
+}
+
+.workflow-pendiente { background: #fef3c7; color: #92400e; }
+.workflow-respondida { background: #d1fae5; color: #065f46; }
+.workflow-importante { background: #ede9fe; color: #5b21b6; }
+.workflow-idea_contenido { background: #e0f2fe; color: #0369a1; }

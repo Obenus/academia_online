@@ -62,11 +62,34 @@ def default_welcome_subject():
 
 def default_welcome_body():
     return """<p>Hola <strong>{{username}}</strong>,</p>
-<p>Tu registro y pago se han completado correctamente.</p>
-{{approval_note}}
-<p><a href="{{login_url}}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Entrar a la academia</a></p>
+<p>¡Bienvenida a <strong>{{academy_name}}</strong>! Tu suscripción está activa.</p>
+{{welcome_video_block}}
+<p><strong>Tus datos de acceso:</strong></p>
+<ul>
+<li>Email: <strong>{{email}}</strong></li>
+<li>Usuario: <strong>{{username}}</strong></li>
+<li>Contraseña: <strong>{{password}}</strong></li>
+</ul>
+<p style="color:#b45309;font-size:13px">Te recomendamos cambiar la contraseña en Mi cuenta tras el primer acceso.</p>
+<p><a href="{{login_url}}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Entrar a la comunidad</a></p>
 <p>Plan: <strong>{{plan_name}}</strong></p>
 <p style="color:#71717a;font-size:12px">Si tienes dudas, responde a este correo.</p>"""
+
+
+def default_billing_alert_subject():
+    return 'Alerta suscripción: {{username}} — {{reason}}'
+
+
+def default_billing_alert_body():
+    return """<p>Se ha producido un evento de suscripción:</p>
+<ul>
+<li><strong>Usuario:</strong> {{username}}</li>
+<li><strong>Email:</strong> {{email}}</li>
+<li><strong>Plan:</strong> {{plan_name}}</li>
+<li><strong>Motivo:</strong> {{reason}}</li>
+<li><strong>Fecha:</strong> {{fecha}}</li>
+</ul>
+<p style="color:#71717a;font-size:12px">Revisa /admin/suscripciones y el grupo WhatsApp VIP si aplica.</p>"""
 
 
 def default_admin_reg_subject():
@@ -157,8 +180,39 @@ def email_wrapper(academy_name, inner_html):
 </div></div>"""
 
 
-def send_welcome_email(app, mail, user, plan_name, login_url, pending_approval=False):
-    s = _payment_settings(app)
+def video_embed_block(url):
+    if not url:
+        return ''
+    embed = url
+    if 'youtu.be/' in url:
+        vid = url.split('youtu.be/')[1].split('?')[0]
+        embed = f'https://www.youtube.com/embed/{vid}'
+    elif 'youtube.com' in url and 'embed' not in url:
+        if 'v=' in url:
+            vid = url.split('v=')[1].split('&')[0]
+            embed = f'https://www.youtube.com/embed/{vid}'
+    elif 'vimeo.com' in url and 'player.vimeo.com' not in url:
+        path = url.split('vimeo.com/')[1].split('?')[0]
+        parts = path.split('/')
+        embed = f'https://player.vimeo.com/video/{parts[0]}'
+    return (
+        f'<div style="margin:16px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px">'
+        f'<iframe src="{escape(embed)}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" '
+        f'allowfullscreen></iframe></div>'
+    )
+
+
+def get_admin_emails(app):
+    admin_email = (app.config.get('ADMIN_EMAIL') or '').strip()
+    if admin_email:
+        return [admin_email]
+    from models import User
+    return [a.email for a in User.query.filter_by(role='admin').all() if a.email]
+
+
+def send_welcome_email(app, mail, user, plan_name, login_url, pending_approval=False,
+                       plain_password='', site=None):
+    s = site or _payment_settings(app)
     subject = (s.welcome_email_subject if s and s.welcome_email_subject else default_welcome_subject())
     body = (s.welcome_email_body if s and s.welcome_email_body else default_welcome_body())
     academy = (s.academy_name if s and s.academy_name else None) or app.config.get('ACADEMY_NAME', 'Academia')
@@ -166,26 +220,32 @@ def send_welcome_email(app, mail, user, plan_name, login_url, pending_approval=F
         '<p style="color:#b45309">Tu pago está confirmado. Un administrador revisará tu cuenta y te avisará cuando puedas entrar.</p>'
         if pending_approval else ''
     )
+    video_block = video_embed_block(getattr(s, 'welcome_video_url', '') or '')
     ctx = {
         'username': user.username,
         'email': user.email,
+        'password': plain_password or '—',
         'plan_name': plan_name or '—',
         'academy_name': academy,
         'login_url': login_url,
         'approval_note': approval_note,
+        'welcome_video_block': video_block,
     }
     subject = render_template_vars(subject, **ctx)
     inner = render_template_vars(body, **ctx)
     return send_html_email(app, mail, [user.email], subject, email_wrapper(academy, inner))
 
 
-def send_admin_registration_email(app, mail, user, plan_name, status_label, plan=None):
-    from models import User
+def send_admin_registration_email(app, mail, user, plan_name, status_label, plan=None, region_label=''):
     s = _payment_settings(app)
     subject = (s.admin_reg_email_subject if s and s.admin_reg_email_subject else default_admin_reg_subject())
     body = (s.admin_reg_email_body if s and s.admin_reg_email_body else default_admin_reg_body())
     academy = (s.academy_name if s and s.academy_name else None) or app.config.get('ACADEMY_NAME', 'Academia')
-    plan_price = f'{plan.price_monthly:.2f} €/mes' if plan else '—'
+    if plan:
+        price = plan.price_for_region('intl' if 'Internacional' in (region_label or '') else 'es')
+        plan_price = f'{price:.2f} €/mes'
+    else:
+        plan_price = '—'
     created = user.created_at.strftime('%d/%m/%Y %H:%M') if user.created_at else '—'
     ctx = {
         'username': user.username,
@@ -200,15 +260,42 @@ def send_admin_registration_email(app, mail, user, plan_name, status_label, plan
     }
     subject = render_template_vars(subject, **ctx)
     inner = render_template_vars(body, **ctx)
-    admins = User.query.filter_by(role='admin').all()
-    emails = [a.email for a in admins if a.email]
+    emails = get_admin_emails(app)
     if not emails:
         return False
     return send_html_email(app, mail, emails, subject, email_wrapper(academy, inner))
 
 
-def notify_admins_payment_failed(db, notify_fn, user, reason):
+def send_admin_billing_alert_email(app, mail, user, reason, event_date=None):
+    s = _payment_settings(app)
+    subject_tpl = (s.billing_alert_email_subject if s and s.billing_alert_email_subject else None) or default_billing_alert_subject()
+    body_tpl = (s.billing_alert_email_body if s and s.billing_alert_email_body else None) or default_billing_alert_body()
+    academy = (s.academy_name if s and s.academy_name else None) or app.config.get('ACADEMY_NAME', 'Academia')
+    plan_name = user.subscription_plan.name if user.subscription_plan else '—'
+    fecha = (event_date or datetime.utcnow()).strftime('%d/%m/%Y %H:%M')
+    ctx = {
+        'username': user.username,
+        'email': user.email,
+        'plan_name': plan_name,
+        'reason': reason,
+        'fecha': fecha,
+        'academy_name': academy,
+    }
+    subject = render_template_vars(subject_tpl, **ctx)
+    inner = render_template_vars(body_tpl, **ctx)
+    emails = get_admin_emails(app)
+    if not emails:
+        return False
+    return send_html_email(app, mail, emails, subject, email_wrapper(academy, inner))
+
+
+def mark_whatsapp_vip_pending(user):
+    user.whatsapp_vip_pending = True
+
+
+def notify_admins_payment_failed(db, notify_fn, user, reason, app=None, mail=None):
     from models import User
+    mark_whatsapp_vip_pending(user)
     admins = User.query.filter_by(role='admin').all()
     for admin in admins:
         notify_fn(
@@ -217,6 +304,11 @@ def notify_admins_payment_failed(db, notify_fn, user, reason):
             f'⚠️ {user.username} no ha abonado la mensualidad ({reason}). Revisa su cuenta.',
             '/admin/suscripciones',
         )
+    if app and mail:
+        try:
+            send_admin_billing_alert_email(app, mail, user, reason)
+        except Exception as e:
+            print(f'[billing] admin alert email: {e}')
 
 
 def user_payment_label(user):
@@ -237,7 +329,11 @@ def user_payment_label(user):
 
 
 def sync_stripe_subscription(app, user, subscription_obj):
-    """Actualiza usuario desde objeto subscription de Stripe (objeto o dict)."""
+    """Actualiza usuario desde objeto subscription de Stripe (objeto o dict o id str)."""
+    if isinstance(subscription_obj, str):
+        import stripe
+        stripe.api_key = get_stripe_secret(app)
+        subscription_obj = stripe.Subscription.retrieve(subscription_obj)
     if isinstance(subscription_obj, dict):
         status = subscription_obj.get('status', 'none')
         sub_id = subscription_obj.get('id', '')
@@ -298,6 +394,56 @@ def create_subscription_checkout(
             kwargs['discounts'] = [{'coupon': coupon}]
 
     session = stripe.checkout.Session.create(**kwargs)
+    return session
+
+
+def create_public_subscription_checkout(app, plan, billing_region, success_url, cancel_url, checkout_intent_id):
+    """Checkout sin usuario en BD (landing pública)."""
+    import stripe
+    from models import db, CheckoutIntent
+    stripe.api_key = get_stripe_secret(app)
+    region = billing_region if billing_region in ('es', 'intl') else 'es'
+    price_id = plan.stripe_price_for_region(region)
+    unit_price = plan.price_for_region(region)
+    line_item = {'quantity': 1}
+    if price_id:
+        line_item['price'] = price_id
+    else:
+        line_item['price_data'] = {
+            'currency': 'eur',
+            'recurring': {'interval': 'month'},
+            'product_data': {'name': plan.name, 'description': (plan.description or '')[:200]},
+            'unit_amount': int(round((unit_price or 0) * 100)),
+        }
+    sub_data = {
+        'metadata': {
+            'checkout_intent_id': str(checkout_intent_id),
+            'plan_id': str(plan.id),
+            'billing_region': region,
+        }
+    }
+    trial_days = getattr(plan, 'trial_days', 0) or 0
+    if trial_days > 0:
+        sub_data['trial_period_days'] = trial_days
+
+    session = stripe.checkout.Session.create(
+        mode='subscription',
+        payment_method_types=['card'],
+        line_items=[line_item],
+        success_url=success_url,
+        cancel_url=cancel_url,
+        client_reference_id=str(checkout_intent_id),
+        metadata={
+            'checkout_intent_id': str(checkout_intent_id),
+            'plan_id': str(plan.id),
+            'billing_region': region,
+        },
+        subscription_data=sub_data,
+    )
+    intent = CheckoutIntent.query.get(checkout_intent_id)
+    if intent:
+        intent.stripe_session_id = session.id
+        db.session.commit()
     return session
 
 

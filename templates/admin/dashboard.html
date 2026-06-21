@@ -1,87 +1,123 @@
 {% extends 'base.html' %}
 {% block title %}Panel Admin{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
 
 {% block content %}
-<h1 class="text-xl font-bold text-[#18181b] mb-6">⚙️ Panel de administración</h1>
+{% include 'admin/_nav.html' %}
 
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-  {% for label, val, icon, color in [
-    ('Alumnos',       stats.users,       '👥', 'violet'),
-    ('Cursos',        stats.courses,     '📚', 'blue'),
-    ('Posts',         stats.posts,       '💬', 'green'),
-    ('Inscripciones', stats.enrollments, '🎓', 'orange'),
-  ] %}
-  <div class="bg-white border border-[#e4e4e7] rounded-xl p-5 shadow-sm">
-    <p class="text-2xl mb-2">{{ icon }}</p>
-    <p class="text-2xl font-bold text-[#18181b]">{{ val }}</p>
-    <p class="text-xs text-[#71717a] mt-0.5">{{ label }}</p>
-  </div>
-  {% endfor %}
+<div class="admin-page-head">
+  <h1>Panel de administración</h1>
+  <p>Usa el menú de la izquierda para ir a cada sección.</p>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
-  <div class="bg-white border border-[#e4e4e7] rounded-xl p-5 shadow-sm">
-    <h2 class="text-sm font-bold text-[#18181b] mb-4">🚀 Acciones rápidas</h2>
-    <div class="space-y-2">
-      <a href="{{ url_for('admin_new_course') }}"     class="btn btn-primary w-full justify-center">➕ Nuevo curso</a>
-      <a href="{{ url_for('admin_new_live_class') }}" class="btn btn-secondary w-full justify-center">📅 Nuevo evento (calendario)</a>
-      <a href="{{ url_for('new_post') }}"             class="btn btn-secondary w-full justify-center">✏️ Publicar en comunidad</a>
-      <a href="{{ url_for('admin_email') }}"          class="btn btn-secondary w-full justify-center">📧 Enviar email a alumnos</a>
-      <a href="{{ url_for('admin_settings') }}"       class="btn btn-secondary w-full justify-center">⚙️ Ajustes comunidad</a>
-      <a href="{{ url_for('admin_backups') }}"        class="btn btn-secondary w-full justify-center">💾 Backups</a>
-      <a href="{{ url_for('admin_plans') }}"          class="btn btn-secondary w-full justify-center">📋 Planes y precios</a>
-      <a href="{{ url_for('admin_payments') }}"       class="btn btn-secondary w-full justify-center">💳 Pagos Stripe</a>
-      <a href="{{ url_for('admin_subscriptions') }}"  class="btn btn-secondary w-full justify-center">📊 Suscripciones</a>
-      <a href="{{ url_for('features.admin_stats') }}" class="btn btn-secondary w-full justify-center">📈 Estadísticas</a>
-      <a href="{{ url_for('features.admin_moderation') }}" class="btn btn-secondary w-full justify-center">🛡 Moderación</a>
-      <a href="{{ url_for('features.admin_assignments') }}" class="btn btn-secondary w-full justify-center">📤 Tareas / entregas</a>
-      <a href="{{ url_for('features.admin_export_users_csv') }}" class="btn btn-secondary w-full justify-center">⬇ Exportar usuarios CSV</a>
-      <a href="{{ url_for('features.admin_email_campaigns') }}" class="btn btn-secondary w-full justify-center">📋 Historial emails</a>
-    </div>
-  </div>
+{# Métricas — clicables #}
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+  <a href="{{ url_for('admin_users') }}" class="rounded-xl p-4 transition hover:shadow-md" style="background:var(--surface);border:1px solid var(--border);text-decoration:none">
+    <p class="text-lg mb-1">👥</p>
+    <p class="text-xl font-bold" style="color:var(--text1)">{{ stats.users }}</p>
+    <p class="text-[11px] mt-0.5" style="color:var(--text4)">Miembros</p>
+  </a>
+  <a href="{{ url_for('community') }}" class="rounded-xl p-4 transition hover:shadow-md" style="background:var(--surface);border:1px solid var(--border);text-decoration:none">
+    <p class="text-lg mb-1">💬</p>
+    <p class="text-xl font-bold" style="color:var(--text1)">{{ stats.posts }}</p>
+    <p class="text-[11px] mt-0.5" style="color:var(--text4)">Posts</p>
+  </a>
+  <a href="{{ url_for('library.admin_list') }}" class="rounded-xl p-4 transition hover:shadow-md" style="background:var(--surface);border:1px solid var(--border);text-decoration:none">
+    <p class="text-lg mb-1">📚</p>
+    <p class="text-xl font-bold" style="color:var(--text1)">{{ stats.library }}</p>
+    <p class="text-[11px] mt-0.5" style="color:var(--text4)">Biblioteca</p>
+  </a>
+  <a href="{{ url_for('resources.admin_list') }}" class="rounded-xl p-4 transition hover:shadow-md" style="background:var(--surface);border:1px solid var(--border);text-decoration:none">
+    <p class="text-lg mb-1">📎</p>
+    <p class="text-xl font-bold" style="color:var(--text1)">{{ stats.resources }}</p>
+    <p class="text-[11px] mt-0.5" style="color:var(--text4)">Recursos</p>
+  </a>
+  <a href="{{ url_for('admin_subscriptions') }}" class="rounded-xl p-4 transition hover:shadow-md" style="background:var(--surface);border:1px solid var(--border);text-decoration:none">
+    <p class="text-lg mb-1">💳</p>
+    <p class="text-xl font-bold" style="color:var(--text1)">{{ stats.active_subs }}</p>
+    <p class="text-[11px] mt-0.5" style="color:var(--text4)">Suscripciones</p>
+  </a>
+  <a href="{{ url_for('features.admin_moderation') }}" class="rounded-xl p-4 transition hover:shadow-md relative" style="background:var(--surface);border:1px solid var(--border);text-decoration:none">
+    {% if admin_nav.pending_reports %}
+    <span class="absolute top-2 right-2 text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full">{{ admin_nav.pending_reports }}</span>
+    {% endif %}
+    <p class="text-lg mb-1">🛡</p>
+    <p class="text-xl font-bold" style="color:var(--text1)">{{ admin_nav.pending_reports or '—' }}</p>
+    <p class="text-[11px] mt-0.5" style="color:var(--text4)">Reportes</p>
+  </a>
+</div>
 
-  <div class="bg-white border border-[#e4e4e7] rounded-xl p-5 shadow-sm">
-    <h2 class="text-sm font-bold text-[#18181b] mb-4">🏷 Categorías de comunidad</h2>
-    <div class="space-y-2 mb-4 max-h-40 overflow-y-auto">
+{# Solo 4 acciones frecuentes — el resto está en el menú lateral #}
+<div class="mb-6">
+  <h2 class="text-xs font-bold uppercase tracking-wide mb-3" style="color:var(--text4)">Acciones frecuentes</h2>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <a href="{{ url_for('admin_settings') }}" class="flex flex-col items-center text-center gap-2 p-4 rounded-xl border transition hover:border-violet-300 hover:shadow-sm"
+       style="background:var(--surface);border-color:var(--border);text-decoration:none">
+      <span class="text-2xl">⚙️</span>
+      <span class="text-sm font-semibold" style="color:var(--text1)">Ajustes</span>
+    </a>
+    <a href="{{ url_for('new_post') }}" class="flex flex-col items-center text-center gap-2 p-4 rounded-xl border transition hover:border-violet-300 hover:shadow-sm"
+       style="background:var(--surface);border-color:var(--border);text-decoration:none">
+      <span class="text-2xl">✏️</span>
+      <span class="text-sm font-semibold" style="color:var(--text1)">Publicar</span>
+    </a>
+    <a href="{{ url_for('admin_new_live_class') }}" class="flex flex-col items-center text-center gap-2 p-4 rounded-xl border transition hover:border-violet-300 hover:shadow-sm"
+       style="background:var(--surface);border-color:var(--border);text-decoration:none">
+      <span class="text-2xl">📅</span>
+      <span class="text-sm font-semibold" style="color:var(--text1)">Nuevo evento</span>
+    </a>
+    <a href="{{ url_for('admin_subscriptions') }}" class="flex flex-col items-center text-center gap-2 p-4 rounded-xl border transition hover:border-violet-300 hover:shadow-sm relative"
+       style="background:var(--surface);border-color:var(--border);text-decoration:none">
+      {% if admin_nav.whatsapp_pending %}
+      <span class="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full"></span>
+      {% endif %}
+      <span class="text-2xl">📊</span>
+      <span class="text-sm font-semibold" style="color:var(--text1)">Suscripciones</span>
+    </a>
+  </div>
+</div>
+
+{# Categorías del foro — colapsable #}
+<details class="rounded-xl mb-4" style="background:var(--surface);border:1px solid var(--border)">
+  <summary class="px-4 py-3 cursor-pointer text-sm font-semibold flex items-center justify-between" style="color:var(--text1)">
+    <span>🏷 Categorías del foro ({{ categories|length }})</span>
+    <span class="text-xs font-normal" style="color:var(--text4)">clic para editar</span>
+  </summary>
+  <div class="px-4 pb-4 border-t" style="border-color:var(--border)">
+    <div class="flex flex-wrap gap-2 my-4">
       {% for cat in categories %}
-      <div class="flex items-center justify-between">
-        <span class="text-sm px-3 py-1 rounded-full font-medium"
-              style="background:{{ cat.color }}18; color:{{ cat.color }}">
-          {{ cat.emoji }} {{ cat.name }}
-        </span>
-        <form method="POST" action="{{ url_for('admin_delete_category', cat_id=cat.id) }}"
+      <span class="inline-flex items-center gap-1 text-sm px-3 py-1 rounded-full font-medium"
+            style="background:{{ cat.color }}18; color:{{ cat.color }}">
+        {{ cat.emoji }} {{ cat.name }}
+        {% if not cat.is_system %}
+        <form method="POST" action="{{ url_for('admin_delete_category', cat_id=cat.id) }}" class="inline"
               onsubmit="return confirm('¿Eliminar?')">
-          <button type="submit" class="text-xs text-[#a1a1aa] hover:text-red-500 transition">✕</button>
+          <button type="submit" class="text-[10px] opacity-50 hover:text-red-500">✕</button>
         </form>
-      </div>
+        {% endif %}
+      </span>
       {% endfor %}
     </div>
-    <form method="POST" action="{{ url_for('admin_new_category') }}" class="space-y-2">
-      <div class="flex gap-2">
-        <input type="text"  name="emoji" class="input w-14 text-center" placeholder="💬" maxlength="2"/>
-        <input type="text"  name="name"  class="input flex-1" placeholder="Nombre" required/>
-        <input type="color" name="color" value="#7c3aed"
-               class="h-10 w-10 rounded-lg border border border-[#d4d4d8] cursor-pointer flex-shrink-0 bg-white"/>
-      </div>
-      <select name="required_plan_id" class="input text-sm">
-        <option value="">Todos los planes</option>
-        {% for p in all_plans %}
-        <option value="{{ p.id }}">Solo plan: {{ p.name }}</option>
-        {% endfor %}
-      </select>
-      <button type="submit" class="btn btn-secondary btn-sm">Añadir categoría</button>
+    <form method="POST" action="{{ url_for('admin_new_category') }}" class="flex flex-wrap gap-2 items-end">
+      <input type="text" name="emoji" class="input w-12 text-center" placeholder="💬" maxlength="2"/>
+      <input type="text" name="name" class="input flex-1 min-w-[120px]" placeholder="Nueva categoría" required/>
+      <input type="color" name="color" value="#7c3aed" class="h-10 w-10 rounded-lg border cursor-pointer" style="border-color:var(--border)"/>
+      <button type="submit" class="btn btn-secondary btn-sm">Añadir</button>
     </form>
   </div>
-</div>
+</details>
 
-<!-- Importar desde Skool -->
-<div class="mt-6 bg-violet-50 border border-violet-200 rounded-xl p-5">
-  <h2 class="text-sm font-bold text-violet-800 mb-2">📥 Importar desde Skool</h2>
-  <a href="{{ url_for('admin_importar_descripciones') }}"
-     onclick="return confirm('¿Importar descripciones y vídeos desde Skool? Solo actualiza lecciones vacías.')"
-     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition">
-    📋 Importar descripciones y vídeos de Skool
-  </a>
-  <p class="text-xs text-violet-600 mt-2">Solo rellena las lecciones que están vacías, no sobreescribe lo que ya tienes.</p>
-</div>
+<details class="rounded-xl" style="background:var(--faint);border:1px solid var(--border)">
+  <summary class="px-4 py-3 cursor-pointer text-sm font-semibold" style="color:var(--text2)">🔧 Herramientas avanzadas</summary>
+  <div class="px-4 pb-4 space-y-2 border-t" style="border-color:var(--border)">
+    <a href="{{ url_for('features.admin_export_users_csv') }}" class="block text-sm py-2 hover:text-violet-600" style="color:var(--text2)">⬇ Exportar usuarios CSV</a>
+    <a href="{{ url_for('features.admin_email_campaigns') }}" class="block text-sm py-2 hover:text-violet-600" style="color:var(--text2)">📋 Historial de emails</a>
+    <a href="{{ url_for('admin_importar_descripciones') }}"
+       onclick="return confirm('¿Importar desde Skool?')"
+       class="block text-sm py-2 hover:text-violet-600" style="color:var(--text2)">📥 Importar desde Skool</a>
+    <a href="{{ url_for('admin_courses') }}" class="block text-sm py-2 hover:text-violet-600" style="color:var(--text2)">🎓 Cursos legacy</a>
+  </div>
+</details>
+
+{% include 'admin/_nav_footer.html' %}
 {% endblock %}

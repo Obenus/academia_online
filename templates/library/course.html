@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }} — Biblioteca{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('library.index') }}" class="text-sm inline-flex items-center gap-1 mb-4" style="color:var(--text3)">← Biblioteca</a>
+
+<div class="flex flex-col sm:flex-row gap-4 mb-6">
+  {% if course and course.cover_data %}
+  <div class="w-full sm:w-48 flex-shrink-0 rounded-xl overflow-hidden aspect-video sm:aspect-square"
+       style="background:#1a1a1a">
+    <img src="{{ url_for('serve_course_cover', course_id=course.id) }}" alt="" class="w-full h-full object-cover"/>
+  </div>
+  {% endif %}
+  <div>
+    <h1 class="text-xl font-bold" style="color:var(--text1)">{{ title }}</h1>
+    {% if subtitle %}<p class="text-sm mt-1" style="color:var(--text3)">{{ subtitle }}</p>{% endif %}
+    <p class="text-xs mt-2 font-medium" style="color:var(--text4)">{{ items|length }} vídeo{{ 's' if items|length != 1 else '' }}</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+  {% for item in items %}
+  {% if item.video_url %}
+  <div role="button" tabindex="0"
+       class="lib-video-card cursor-pointer rounded-2xl overflow-hidden border shadow-sm transition hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-violet-500"
+       style="background:var(--surface);border-color:var(--border)"
+       data-library-play
+       data-item-id="{{ item.id }}">
+
+    <div class="aspect-video relative overflow-hidden pointer-events-none" style="background:#111">
+      <img src="{{ url_for('library.thumbnail', item_id=item.id) }}" alt=""
+           class="w-full h-full object-cover" loading="lazy" draggable="false"/>
+      <div class="absolute inset-0 flex items-center justify-center bg-black/25">
+        <span class="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center text-xl shadow-lg">▶</span>
+      </div>
+      {% if item.item_type == 'encuentro' %}
+      <span class="absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded text-white bg-red-600">Encuentro</span>
+      {% endif %}
+    </div>
+
+    <div class="p-4 pointer-events-none">
+      <p class="lib-video-title font-semibold text-sm leading-snug line-clamp-2" style="color:var(--text1)">{{ item.title }}</p>
+      {% if item.description and ' — ' in item.description %}
+      <p class="text-xs mt-1 line-clamp-1" style="color:var(--text4)">{{ item.description.split(' — ', 1)[1] }}</p>
+      {% endif %}
+      <p class="text-xs mt-2 font-semibold text-violet-600">Ver vídeo</p>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+{% include 'library/_video_modal.html' %}
+{% endblock %}

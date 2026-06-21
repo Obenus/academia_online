@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>{{ site.landing_title or site.academy_name or academy_name }}</title>
+<script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/theme.css"/>
+<style>
+  body{background:#fafafa;color:#18181b;font-family:'Segoe UI',system-ui,sans-serif;margin:0;}
+  .input{background:#fff;border:1px solid #d4d4d8;border-radius:8px;padding:10px 14px;font-size:14px;width:100%;outline:none;box-sizing:border-box;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 20px;border-radius:10px;font-weight:600;border:none;cursor:pointer;text-decoration:none;transition:.15s;}
+  .btn-primary{background:var(--brand-primary,#7c3aed);color:#fff;}
+  .btn-primary:hover{filter:brightness(.95);}
+  .plan-card{border:2px solid #e4e4e7;border-radius:16px;padding:24px;background:#fff;transition:.15s;}
+  .plan-card.selected{border-color:var(--brand-primary,#7c3aed);box-shadow:0 0 0 3px rgba(124,58,237,.12);}
+</style>
+</head>
+<body>
+<header class="border-b bg-white px-4 py-3 flex items-center justify-between">
+  <div class="flex items-center gap-2 font-bold text-sm">
+    {% if site.brand_logo_url %}
+    <img src="{{ site.brand_logo_url }}" alt="" class="h-8"/>
+    {% else %}
+    <span class="text-xl">🌸</span>
+    {% endif %}
+    {{ site.academy_name or academy_name }}
+  </div>
+  <a href="{{ url_for('login') }}" class="text-sm font-medium text-violet-600 hover:text-violet-800">Iniciar sesión</a>
+</header>
+
+<main class="max-w-4xl mx-auto px-4 py-10">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="mb-6 space-y-2">
+    {% for cat, msg in messages %}
+    <div class="px-4 py-3 rounded-lg text-sm border {% if cat=='error' %}bg-red-50 border-red-200 text-red-700{% else %}bg-green-50 border-green-200 text-green-700{% endif %}">{{ msg }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  <div class="text-center mb-10">
+    <h1 class="text-3xl sm:text-4xl font-bold mb-3">{{ site.landing_title or 'Únete a la comunidad' }}</h1>
+    <p class="text-lg text-zinc-600 max-w-2xl mx-auto">{{ site.landing_subtitle or 'Un espacio seguro para crecer, conectar y aprender juntas.' }}</p>
+  </div>
+
+  {% if site.landing_benefits %}
+  <div class="grid sm:grid-cols-2 gap-3 mb-10">
+    {% for line in site.landing_benefits.split('\n') if line.strip() %}
+    <div class="flex items-start gap-2 bg-white rounded-xl p-4 border border-zinc-200">
+      <span class="text-violet-600">✓</span>
+      <span class="text-sm">{{ line.strip() }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="bg-white rounded-2xl border border-zinc-200 p-6 shadow-sm mb-8">
+    <h2 class="text-lg font-bold mb-4 text-center">Elige tu plan</h2>
+
+    <form method="POST" action="{{ url_for('checkout_start') }}" id="checkout-form">
+      <div class="flex justify-center gap-2 mb-6">
+        <label class="cursor-pointer">
+          <input type="radio" name="billing_region" value="es" class="sr-only region-radio" {% if region=='es' %}checked{% endif %}/>
+          <span class="inline-block px-4 py-2 rounded-full text-sm font-semibold border region-label {% if region=='es' %}bg-violet-600 text-white border-violet-600{% else %}bg-white text-zinc-600 border-zinc-300{% endif %}">🇪🇸 España</span>
+        </label>
+        <label class="cursor-pointer">
+          <input type="radio" name="billing_region" value="intl" class="sr-only region-radio" {% if region=='intl' %}checked{% endif %}/>
+          <span class="inline-block px-4 py-2 rounded-full text-sm font-semibold border region-label {% if region=='intl' %}bg-violet-600 text-white border-violet-600{% else %}bg-white text-zinc-600 border-zinc-300{% endif %}">🌍 Fuera de España</span>
+        </label>
+      </div>
+
+      <div class="grid sm:grid-cols-{% if plans|length > 1 %}2{% else %}1{% endif %} gap-4 mb-6">
+        {% for plan in plans %}
+        <label class="plan-card cursor-pointer block {% if loop.first %}selected{% endif %}" data-plan-id="{{ plan.id }}">
+          <input type="radio" name="plan_id" value="{{ plan.id }}" class="sr-only plan-radio" {% if loop.first %}checked{% endif %}/>
+          <p class="font-bold text-lg mb-1">{{ plan.name }}</p>
+          {% if plan.description %}
+          <p class="text-sm text-zinc-500 mb-3">{{ plan.description }}</p>
+          {% endif %}
+          <p class="text-2xl font-bold text-violet-700">
+            <span class="price-es" {% if region!='es' %}style="display:none"{% endif %}>{{ '%.2f'|format(plan.price_for_region('es')) }} €</span>
+            <span class="price-intl" {% if region!='intl' %}style="display:none"{% endif %}>{{ '%.2f'|format(plan.price_for_region('intl')) }} €</span>
+            <span class="text-sm font-normal text-zinc-500">/mes</span>
+          </p>
+        </label>
+        {% else %}
+        <p class="text-center text-zinc-500 col-span-2">No hay planes disponibles en este momento.</p>
+        {% endfor %}
+      </div>
+
+      {% if plans and stripe_pk %}
+      <button type="submit" class="btn btn-primary w-full text-base">Únete ahora →</button>
+      {% elif plans %}
+      <p class="text-center text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">Los pagos aún no están configurados. Contacta con el administrador.</p>
+      {% endif %}
+    </form>
+  </div>
+
+  <p class="text-center text-xs text-zinc-400">Pago seguro con Stripe · Acceso inmediato tras el pago</p>
+</main>
+
+<script>
+document.querySelectorAll('.region-radio').forEach(r => {
+  r.addEventListener('change', () => {
+    const isEs = document.querySelector('.region-radio[value="es"]').checked;
+    document.querySelectorAll('.region-label').forEach((el, i) => {
+      const on = (i === 0 && isEs) || (i === 1 && !isEs);
+      el.classList.toggle('bg-violet-600', on);
+      el.classList.toggle('text-white', on);
+      el.classList.toggle('border-violet-600', on);
+      el.classList.toggle('bg-white', !on);
+      el.classList.toggle('text-zinc-600', !on);
+      el.classList.toggle('border-zinc-300', !on);
+    });
+    document.querySelectorAll('.price-es').forEach(el => el.style.display = isEs ? '' : 'none');
+    document.querySelectorAll('.price-intl').forEach(el => el.style.display = isEs ? 'none' : '');
+  });
+});
+document.querySelectorAll('.plan-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    card.querySelector('.plan-radio').checked = true;
+  });
+});
+</script>
+</body>
+</html>

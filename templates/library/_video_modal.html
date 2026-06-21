@@ -1,0 +1,521 @@
+{# Reproductor modal — barra de controles unificada bajo el vídeo #}
+<style>
+  .lib-player { background:#0a0a0a; }
+  .lib-video-frame {
+    position:relative; width:100%; aspect-ratio:16/9;
+    background:#000; overflow:hidden;
+  }
+  .lib-video-media {
+    position:absolute; inset:0; overflow:hidden;
+  }
+  .lib-video-media iframe,
+  .lib-video-media > div,
+  .lib-yt-host {
+    position:absolute !important; inset:0 !important;
+    width:100% !important; height:100% !important; max-width:100% !important;
+  }
+  .lib-video-media iframe { border:0; pointer-events:none; }
+  .lib-shield-top {
+    position:absolute; top:0; left:0; right:0; height:48px; z-index:4;
+    pointer-events:auto; cursor:default;
+  }
+  .lib-video-loading {
+    position:absolute; inset:0; z-index:6;
+    display:flex; align-items:center; justify-content:center;
+    background:#111; color:#fff; font-size:13px;
+  }
+  .lib-video-loading[hidden] { display:none !important; }
+  .lib-video-tap {
+    position:absolute; inset:0; z-index:3; cursor:pointer;
+  }
+  .lib-controls-bar {
+    padding:10px 14px 12px;
+    background:var(--lib-player-bg, #141414);
+    border-top:1px solid rgba(255,255,255,.08);
+  }
+  .lib-controls-bar[hidden] { display:none !important; }
+  .lib-seek-wrap { margin-bottom:8px; }
+  .lib-range {
+    -webkit-appearance:none; appearance:none;
+    width:100%; height:4px; border-radius:2px;
+    background:rgba(255,255,255,.2); outline:none; cursor:pointer;
+    display:block; box-sizing:border-box;
+    accent-color:var(--lib-player-accent, #a78bfa);
+  }
+  .lib-range::-webkit-slider-thumb {
+    -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+    background:var(--lib-player-accent, #a78bfa); border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.4);
+  }
+  .lib-range::-moz-range-thumb {
+    width:14px; height:14px; border-radius:50%;
+    background:var(--lib-player-accent, #a78bfa); border:2px solid #fff;
+  }
+  .lib-range-vol { width:80px; flex-shrink:0; }
+  .lib-ctrl-row {
+    display:flex; align-items:center; gap:8px; min-width:0;
+  }
+  .lib-ctrl-btn {
+    flex-shrink:0; width:34px; height:34px; padding:0; border:0; border-radius:8px;
+    background:var(--lib-player-btn, rgba(255,255,255,.1)); color:#fff;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    transition:background .15s;
+  }
+  .lib-ctrl-btn:hover { background:rgba(255,255,255,.2); }
+  .lib-ctrl-btn svg { width:16px; height:16px; fill:currentColor; }
+  .lib-ctrl-time {
+    flex-shrink:0; font-size:11px; font-variant-numeric:tabular-nums;
+    color:var(--lib-player-text, rgba(255,255,255,.75)); white-space:nowrap;
+  }
+  .lib-ctrl-spacer { flex:1; min-width:4px; }
+  .lib-ctrl-vol-group {
+    display:flex; align-items:center; gap:6px; flex-shrink:0;
+  }
+  @media (max-width:480px) {
+    .lib-range-vol { width:56px; }
+  }
+  .lib-meta {
+    padding:12px 16px;
+    background:var(--surface);
+    border-top:1px solid var(--border);
+  }
+  .lib-video-frame:fullscreen {
+    aspect-ratio:unset; width:100vw; height:100vh;
+  }
+  .lib-video-frame:fullscreen .lib-controls-bar {
+    position:absolute; bottom:0; left:0; right:0; z-index:20;
+    background:linear-gradient(transparent, rgba(0,0,0,.92));
+    border-top:none;
+  }
+</style>
+
+<div id="lib-video-modal" class="fixed inset-0 z-[100] hidden" aria-hidden="true" role="dialog">
+  <div class="absolute inset-0 bg-black/90 backdrop-blur-sm" data-close-video></div>
+  <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+    <div class="relative w-full max-w-4xl pointer-events-auto" id="lib-video-panel">
+      <button type="button" data-close-video
+              class="absolute -top-10 right-0 sm:-right-2 z-10 w-9 h-9 rounded-full flex items-center justify-center text-white text-lg font-bold transition hover:bg-white/20"
+              aria-label="Cerrar">✕</button>
+      <div class="rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10 lib-player" style="{{ player_bar_style }}">
+        <div id="lib-video-frame" class="lib-video-frame">
+          <div id="lib-video-loading" class="lib-video-loading" hidden>Cargando vídeo…</div>
+          <div id="lib-video-media" class="lib-video-media"></div>
+          <div id="lib-video-tap" class="lib-video-tap" aria-hidden="true"></div>
+          <div class="lib-shield-top" title=""></div>
+        </div>
+
+        <div id="lib-controls" class="lib-controls-bar" hidden>
+          <div class="lib-seek-wrap">
+            <input type="range" id="lib-ctrl-seek" class="lib-range" min="0" max="1000" value="0" step="1"
+                   aria-label="Posición de reproducción"/>
+          </div>
+          <div class="lib-ctrl-row">
+            <button type="button" id="lib-ctrl-play" class="lib-ctrl-btn" aria-label="Reproducir">
+              <svg id="lib-icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              <svg id="lib-icon-pause" viewBox="0 0 24 24" hidden><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+            <span id="lib-ctrl-time" class="lib-ctrl-time">0:00 / 0:00</span>
+            <div class="lib-ctrl-spacer"></div>
+            <div class="lib-ctrl-vol-group">
+              <button type="button" id="lib-ctrl-mute" class="lib-ctrl-btn" aria-label="Silenciar">
+                <svg id="lib-icon-vol" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                <svg id="lib-icon-muted" viewBox="0 0 24 24" hidden><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+              </button>
+              <input type="range" id="lib-ctrl-vol" class="lib-range lib-range-vol" min="0" max="100" value="100"
+                     aria-label="Volumen"/>
+            </div>
+            <button type="button" id="lib-ctrl-fs" class="lib-ctrl-btn" aria-label="Pantalla completa">
+              <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="lib-meta">
+          <p id="lib-video-title" class="text-sm font-semibold leading-snug" style="color:var(--text1)"></p>
+          <p class="text-[11px] mt-1" style="color:var(--text4)">Contenido exclusivo de la comunidad. No compartir fuera de la plataforma.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const modal = document.getElementById('lib-video-modal');
+  const frame = document.getElementById('lib-video-frame');
+  const mediaHost = document.getElementById('lib-video-media');
+  const tap = document.getElementById('lib-video-tap');
+  const controls = document.getElementById('lib-controls');
+  const playBtn = document.getElementById('lib-ctrl-play');
+  const iconPlay = document.getElementById('lib-icon-play');
+  const iconPause = document.getElementById('lib-icon-pause');
+  const seekEl = document.getElementById('lib-ctrl-seek');
+  const timeEl = document.getElementById('lib-ctrl-time');
+  const muteBtn = document.getElementById('lib-ctrl-mute');
+  const iconVol = document.getElementById('lib-icon-vol');
+  const iconMuted = document.getElementById('lib-icon-muted');
+  const volEl = document.getElementById('lib-ctrl-vol');
+  const fsBtn = document.getElementById('lib-ctrl-fs');
+  const titleEl = document.getElementById('lib-video-title');
+  const loadingEl = document.getElementById('lib-video-loading');
+  const playUrl = '{{ url_for("library.play_api", item_id=0) }}'.replace('/0', '/');
+
+  if (!modal || !mediaHost) return;
+
+  let driver = null;
+  let tickTimer = null;
+  let seeking = false;
+  let savedVol = 1;
+
+  function fmtTime(s) {
+    s = Math.max(0, Math.floor(s || 0));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    const pad = n => String(n).padStart(2, '0');
+    return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+  }
+
+  function blockContextMenu(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  }
+
+  frame.querySelector('.lib-shield-top').addEventListener('contextmenu', blockContextMenu);
+  document.addEventListener('contextmenu', e => {
+    if (modal.classList.contains('hidden')) return;
+    const r = frame.getBoundingClientRect();
+    if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+      blockContextMenu(e);
+    }
+  }, true);
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const ready = () => {
+        if (src.includes('iframe_api')) return window.YT && window.YT.Player;
+        if (src.includes('player.js')) return window.Vimeo && window.Vimeo.Player;
+        return true;
+      };
+      if (ready()) { resolve(); return; }
+      const existing = document.querySelector(`script[src="${src}"]`);
+      if (existing) {
+        const wait = setInterval(() => { if (ready()) { clearInterval(wait); resolve(); } }, 50);
+        setTimeout(() => { clearInterval(wait); ready() ? resolve() : reject(new Error('script-timeout')); }, 15000);
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => {
+        if (ready()) { resolve(); return; }
+        const wait = setInterval(() => { if (ready()) { clearInterval(wait); resolve(); } }, 50);
+        setTimeout(() => { clearInterval(wait); ready() ? resolve() : reject(new Error('script-timeout')); }, 15000);
+      };
+      s.onerror = () => reject(new Error('script'));
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadYouTubeAPI() {
+    return new Promise((resolve, reject) => {
+      if (window.YT && window.YT.Player) { resolve(); return; }
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(); };
+      loadScript('https://www.youtube.com/iframe_api').catch(reject);
+    });
+  }
+
+  function loadVimeoAPI() {
+    return loadScript('https://player.vimeo.com/api/player.js');
+  }
+
+  function clearMediaHost() {
+    mediaHost.innerHTML = '';
+  }
+
+  function sizeEmbed(el) {
+    if (!el) return;
+    el.style.position = 'absolute';
+    el.style.inset = '0';
+    el.style.width = '100%';
+    el.style.height = '100%';
+    const inner = el.querySelector && el.querySelector('iframe');
+    if (inner) {
+      inner.style.width = '100%';
+      inner.style.height = '100%';
+    }
+  }
+
+  function createVimeoIframe(src) {
+    const el = document.createElement('iframe');
+    el.className = 'lib-vimeo-iframe';
+    el.allow = 'autoplay; encrypted-media';
+    el.referrerPolicy = 'strict-origin-when-cross-origin';
+    el.title = 'Reproducción';
+    mediaHost.appendChild(el);
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('iframe-timeout')), 15000);
+      el.onload = () => { clearTimeout(t); sizeEmbed(el); resolve(el); };
+      el.onerror = () => { clearTimeout(t); reject(new Error('iframe')); };
+      el.src = src;
+    });
+  }
+
+  function createYouTubeDriver(videoId, origin) {
+    return new Promise((resolve, reject) => {
+      const host = document.createElement('div');
+      host.className = 'lib-yt-host';
+      mediaHost.appendChild(host);
+      let done = false;
+      const t = setTimeout(() => {
+        if (!done) { done = true; reject(new Error('yt-timeout')); }
+      }, 15000);
+      const vars = {
+        controls: 0, enablejsapi: 1, rel: 0, modestbranding: 1,
+        playsinline: 1, fs: 0, disablekb: 1, iv_load_policy: 3, cc_load_policy: 0,
+      };
+      if (origin) vars.origin = origin;
+      const yt = new YT.Player(host, {
+        width: '100%',
+        height: '100%',
+        videoId,
+        playerVars: vars,
+        events: {
+          onReady: () => {
+            if (done) return;
+            done = true;
+            clearTimeout(t);
+            sizeEmbed(host);
+            sizeEmbed(yt.getIframe());
+            resolve(wrapYouTube(yt));
+          },
+          onError: () => {
+            if (done) return;
+            done = true;
+            clearTimeout(t);
+            reject(new Error('yt-error'));
+          },
+        },
+      });
+    });
+  }
+
+  function wrapYouTube(yt) {
+    return {
+      play: () => yt.playVideo(),
+      pause: () => yt.pauseVideo(),
+      toggle: () => {
+        const s = yt.getPlayerState();
+        if (s === YT.PlayerState.PLAYING) yt.pauseVideo();
+        else yt.playVideo();
+      },
+      getCurrentTime: () => Promise.resolve(yt.getCurrentTime() || 0),
+      getDuration: () => Promise.resolve(yt.getDuration() || 0),
+      seekTo: s => yt.seekTo(s, true),
+      getVolume: () => Promise.resolve((yt.getVolume() || 0) / 100),
+      setVolume: v => yt.setVolume(Math.round(Math.max(0, Math.min(1, v)) * 100)),
+      isPlaying: () => yt.getPlayerState() === YT.PlayerState.PLAYING,
+      destroy: () => { try { yt.destroy(); } catch (_) {} },
+    };
+  }
+
+  async function createVimeoDriver(embedSrc) {
+    const el = await createVimeoIframe(embedSrc);
+    const vp = new Vimeo.Player(el);
+    await vp.ready();
+    return {
+      play: () => vp.play(),
+      pause: () => vp.pause(),
+      toggle: async () => {
+        if (await vp.getPaused()) await vp.play();
+        else await vp.pause();
+      },
+      getCurrentTime: () => vp.getCurrentTime(),
+      getDuration: () => vp.getDuration(),
+      seekTo: s => vp.setCurrentTime(s),
+      getVolume: () => vp.getVolume(),
+      setVolume: v => vp.setVolume(Math.max(0, Math.min(1, v))),
+      isPlaying: async () => !(await vp.getPaused()),
+      destroy: () => vp.destroy().catch(() => {}),
+    };
+  }
+
+  function setPlayIcon(playing) {
+    iconPlay.hidden = playing;
+    iconPause.hidden = !playing;
+    playBtn.setAttribute('aria-label', playing ? 'Pausar' : 'Reproducir');
+  }
+
+  function setMuteIcon(vol) {
+    const muted = vol <= 0.001;
+    iconVol.hidden = muted;
+    iconMuted.hidden = !muted;
+    muteBtn.setAttribute('aria-label', muted ? 'Activar sonido' : 'Silenciar');
+  }
+
+  async function refreshUI() {
+    if (!driver || seeking) return;
+    const cur = await driver.getCurrentTime();
+    const dur = await driver.getDuration();
+    if (dur > 0) seekEl.value = Math.round((cur / dur) * 1000);
+    timeEl.textContent = `${fmtTime(cur)} / ${fmtTime(dur)}`;
+    setPlayIcon(await driver.isPlaying());
+    const vol = await driver.getVolume();
+    volEl.value = Math.round(vol * 100);
+    setMuteIcon(vol);
+  }
+
+  function startTick() {
+    stopTick();
+    tickTimer = setInterval(() => { refreshUI().catch(() => {}); }, 300);
+  }
+
+  function stopTick() {
+    if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  }
+
+  function wireControls() {
+    playBtn.onclick = () => { driver.toggle(); setTimeout(() => refreshUI(), 120); };
+    tap.onclick = () => { driver.toggle(); setTimeout(() => refreshUI(), 120); };
+
+    seekEl.addEventListener('input', async () => {
+      seeking = true;
+      const dur = await driver.getDuration();
+      if (dur > 0) {
+        const cur = (seekEl.value / 1000) * dur;
+        timeEl.textContent = `${fmtTime(cur)} / ${fmtTime(dur)}`;
+      }
+    });
+    seekEl.addEventListener('change', async () => {
+      const dur = await driver.getDuration();
+      if (dur > 0) await driver.seekTo((seekEl.value / 1000) * dur);
+      seeking = false;
+      refreshUI();
+    });
+
+    volEl.addEventListener('input', async () => {
+      const v = volEl.value / 100;
+      await driver.setVolume(v);
+      if (v > 0) savedVol = v;
+      setMuteIcon(v);
+    });
+
+    muteBtn.onclick = async () => {
+      const v = await driver.getVolume();
+      if (v > 0.001) {
+        savedVol = v;
+        await driver.setVolume(0);
+        volEl.value = 0;
+        setMuteIcon(0);
+      } else {
+        const restore = savedVol > 0 ? savedVol : 1;
+        await driver.setVolume(restore);
+        volEl.value = Math.round(restore * 100);
+        setMuteIcon(restore);
+      }
+    };
+
+    fsBtn.onclick = () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else (frame.requestFullscreen || frame.webkitRequestFullscreen)?.call(frame);
+    };
+  }
+
+  function destroyDriver() {
+    stopTick();
+    if (driver) { driver.destroy(); driver = null; }
+    clearMediaHost();
+    controls.hidden = true;
+    seekEl.value = 0;
+    timeEl.textContent = '0:00 / 0:00';
+    setPlayIcon(false);
+  }
+
+  async function openLibraryVideo(itemId) {
+    if (!itemId) return;
+    destroyDriver();
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    loadingEl.hidden = false;
+    controls.hidden = true;
+    titleEl.textContent = '';
+
+    try {
+      const res = await fetch(playUrl + itemId, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+      let data;
+      try { data = await res.json(); } catch (_) { throw new Error('Respuesta inválida'); }
+      if (!res.ok) throw new Error(data.error || 'Error');
+      titleEl.textContent = data.title || '';
+
+      if (data.provider === 'youtube') {
+        if (!data.youtube_id) throw new Error('Sin ID de YouTube');
+        await loadYouTubeAPI();
+        driver = await createYouTubeDriver(data.youtube_id, data.origin || window.location.origin);
+      } else if (data.provider === 'vimeo') {
+        await loadVimeoAPI();
+        driver = await createVimeoDriver(data.embed_src);
+      } else {
+        throw new Error('Proveedor no soportado');
+      }
+
+      const vol = await driver.getVolume();
+      volEl.value = Math.round((vol || 1) * 100);
+      savedVol = vol > 0 ? vol : 1;
+      setMuteIcon(vol);
+
+      wireControls();
+      controls.hidden = false;
+      await refreshUI();
+      startTick();
+    } catch (e) {
+      console.error('Biblioteca vídeo:', e);
+      titleEl.textContent = 'No se pudo cargar el vídeo.';
+    }
+    loadingEl.hidden = true;
+  }
+
+  function closeLibraryVideo() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    destroyDriver();
+    loadingEl.hidden = true;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    titleEl.textContent = '';
+  }
+
+  window.openLibraryVideo = openLibraryVideo;
+  window.closeLibraryVideo = closeLibraryVideo;
+
+  modal.querySelectorAll('[data-close-video]').forEach(el => {
+    el.addEventListener('click', closeLibraryVideo);
+  });
+
+  document.addEventListener('keydown', e => {
+    if (modal.classList.contains('hidden')) return;
+    if (e.key === 'Escape') {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else closeLibraryVideo();
+    }
+    if (e.key === ' ' && e.target.tagName !== 'INPUT' && driver) {
+      e.preventDefault();
+      driver.toggle();
+      setTimeout(() => refreshUI(), 120);
+    }
+  });
+
+  document.querySelectorAll('[data-library-play]').forEach(card => {
+    const id = card.dataset.itemId;
+    const open = () => openLibraryVideo(id);
+    card.addEventListener('click', open);
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+  });
+
+  {% if play_id is defined and play_id %}
+  openLibraryVideo('{{ play_id }}');
+  {% endif %}
+})();
+</script>
