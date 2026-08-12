@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Textos legales{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
+
+{% block content %}
+{% include 'admin/_nav.html' %}
+<div class="admin-page-head">
+  <h1>📜 Textos legales</h1>
+  <p>Markdown. Se muestran en <code>/legal/…</code> y en el footer (pestaña nueva).</p>
+</div>
+
+<div class="rounded-xl p-6 shadow-sm space-y-6" style="background:var(--surface);border:1px solid var(--border)">
+  <form method="POST" class="space-y-6">
+    {% include 'includes/csrf_field.html' %}
+    {% for key, label, path in pages %}
+    <div>
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <label class="block text-xs font-medium" style="color:var(--text3)">{{ label }}</label>
+        <a href="{{ url_for('legal_page', page=path) }}" target="_blank" rel="noopener"
+           class="text-xs font-semibold text-violet-600">Ver →</a>
+      </div>
+      <textarea name="{{ key }}" class="input font-mono text-sm" rows="10">{{ values[key] }}</textarea>
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Guardar textos legales</button>
+  </form>
+</div>
+{% include 'admin/_nav_footer.html' %}
+{% endblock %}

@@ -48,31 +48,29 @@ def video_embed_url(url, origin='', locked=True):
     if 'vimeo.com' in url:
         if 'player.vimeo.com' in url:
             base = url.split('?')[0]
-            return f'{base}?{_VIMEO_PRIVACY}'
+            qs = _VIMEO_PRIVACY if locked else 'dnt=1&title=0&byline=0&portrait=0'
+            return f'{base}?{qs}'
         path = url.split('vimeo.com/')[1].split('?')[0]
         parts = path.split('/')
         vid = parts[0]
+        qs = _VIMEO_PRIVACY if locked else 'dnt=1&title=0&byline=0&portrait=0'
         if len(parts) > 1 and parts[1]:
-            return f'https://player.vimeo.com/video/{vid}?h={parts[1]}&{_VIMEO_PRIVACY}'
-        return f'https://player.vimeo.com/video/{vid}?{_VIMEO_PRIVACY}'
-    vid = None
-    m = re.search(r'youtu\.be/([a-zA-Z0-9_-]{11})', url)
-    if m:
-        vid = m.group(1)
-    if not vid:
-        m = re.search(r'[?&]v=([a-zA-Z0-9_-]{11})', url)
-        if m:
-            vid = m.group(1)
-    if not vid:
-        m = re.search(r'youtube\.com/embed/([a-zA-Z0-9_-]{11})', url)
-        if m:
-            vid = m.group(1)
+            return f'https://player.vimeo.com/video/{vid}?h={parts[1]}&{qs}'
+        return f'https://player.vimeo.com/video/{vid}?{qs}'
+    vid = youtube_video_id(url)
     if not vid:
         return ''
-    qs = _YT_PRIVACY
-    if origin:
-        qs += f'&origin={quote(origin, safe="")}'
-    return f'https://www.youtube-nocookie.com/embed/{vid}?{qs}'
+    if locked:
+        qs = _YT_PRIVACY
+        if origin:
+            qs += f'&origin={quote(origin, safe="")}'
+        return f'https://www.youtube-nocookie.com/embed/{vid}?{qs}'
+    return f'https://www.youtube-nocookie.com/embed/{vid}?rel=0&modestbranding=1&playsinline=1'
+
+
+def video_embed_url_public(url):
+    """Embed público con controles (landing, marketing)."""
+    return video_embed_url(url, locked=False)
 
 
 def video_thumbnail_url(url):

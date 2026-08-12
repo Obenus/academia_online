@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Leads comerciales{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
+
+{% block content %}
+{% include 'admin/_nav.html' %}
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+  <div class="admin-page-head mb-0">
+    <h1>📋 Leads (landing comercial)</h1>
+    <p>{{ leads|length }} registro(s)</p>
+  </div>
+  <div class="flex gap-2">
+    <a href="{{ url_for('admin_commercial_landing') }}" class="btn btn-secondary btn-sm">← Configuración</a>
+    <a href="{{ url_for('admin_commercial_leads_csv') }}" class="btn btn-primary btn-sm">Exportar CSV</a>
+  </div>
+</div>
+
+<div class="rounded-xl overflow-hidden shadow-sm table-scroll" style="background:var(--surface);border:1px solid var(--border)">
+  <table class="w-full text-sm">
+    <thead>
+      <tr style="border-bottom:1px solid var(--border);background:var(--hover-bg)">
+        <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Fecha</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Nombre</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Email</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lead in leads %}
+      <tr style="border-bottom:1px solid var(--border)">
+        <td class="px-4 py-3 text-xs" style="color:var(--text4)">{{ lead.created_at.strftime('%d/%m/%Y %H:%M') if lead.created_at else '—' }}</td>
+        <td class="px-4 py-3 font-medium" style="color:var(--text1)">{{ lead.name }}</td>
+        <td class="px-4 py-3 text-xs" style="color:var(--text3)">{{ lead.email }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="px-4 py-8 text-center text-sm" style="color:var(--text4)">Aún no hay leads.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include 'admin/_nav_footer.html' %}
+{% endblock %}

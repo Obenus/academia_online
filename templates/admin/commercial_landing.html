@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Landing comercial{% endblock %}
+{% block content_class %}max-w-6xl mx-auto{% endblock %}
+
+{% block content %}
+{% include 'admin/_nav.html' %}
+<div class="admin-page-head flex flex-wrap items-start justify-between gap-3">
+  <div>
+    <h1>📣 Landing comercial</h1>
+    <p>Página pública con formulario (nombre + email) y autorespuesta</p>
+  </div>
+  <div class="flex gap-3 text-sm font-semibold">
+    <a href="{{ url_for('admin_commercial_leads') }}" class="text-violet-600">Ver leads →</a>
+    {% if s.commercial_landing_enabled %}
+    <a href="/{{ s.commercial_landing_slug or 'oferta' }}" target="_blank" rel="noopener" class="text-violet-600">Ver página →</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="rounded-xl p-6 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
+  <form method="POST" enctype="multipart/form-data" class="space-y-4">
+    {% include 'includes/csrf_field.html' %}
+    <label class="flex items-center gap-2 text-sm">
+      <input type="checkbox" name="commercial_landing_enabled" {% if s.commercial_landing_enabled %}checked{% endif %}/>
+      Landing activa (si está desactivada, la URL responde 404)
+    </label>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Slug de la URL (solo letras, números y guiones)</label>
+      <div class="flex items-center gap-2">
+        <span class="text-sm" style="color:var(--text4)">/</span>
+        <input type="text" name="commercial_landing_slug" class="input" value="{{ s.commercial_landing_slug or 'oferta' }}" pattern="[a-z0-9\-]+" maxlength="80"/>
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Título</label>
+      <input type="text" name="commercial_landing_title" class="input" value="{{ s.commercial_landing_title or defaults.commercial_landing_title }}"/>
+    </div>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto (Markdown)</label>
+      <textarea name="commercial_landing_text" class="input font-mono text-sm" rows="8">{{ s.commercial_landing_text or defaults.commercial_landing_text }}</textarea>
+    </div>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Enlace WhatsApp (botón de la página)</label>
+      <input type="url" name="commercial_landing_whatsapp_url" class="input" value="{{ s.commercial_landing_whatsapp_url or '' }}" placeholder="https://chat.whatsapp.com/..."/>
+    </div>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Imagen de cabecera</label>
+      {% if s.commercial_landing_image_data %}
+      <img src="{{ url_for('serve_commercial_landing_image') }}" class="mb-2 h-28 rounded-xl object-cover"/>
+      {% endif %}
+      <input type="file" name="commercial_landing_image" accept="image/jpeg,image/png,image/webp,image/gif"/>
+    </div>
+    <hr style="border-color:var(--border)"/>
+    <h2 class="text-sm font-bold" style="color:var(--text1)">Envío de leads</h2>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Email donde recibir cada registro</label>
+      <input type="email" name="commercial_lead_notify_email" class="input" value="{{ s.commercial_lead_notify_email or '' }}" placeholder="admin@ejemplo.com"/>
+    </div>
+    <h2 class="text-sm font-bold" style="color:var(--text1)">Autorespuesta al visitante</h2>
+    <p class="text-[11px]" style="color:var(--text4)">Variables: {% raw %}<code>{{nombre}}</code>, <code>{{email}}</code>, <code>{{whatsapp_url}}</code>, <code>{{academy_name}}</code>{% endraw %}</p>
+    <input type="text" name="commercial_reply_subject" class="input" value="{{ s.commercial_reply_subject or defaults.commercial_reply_subject }}" placeholder="Asunto"/>
+    <textarea name="commercial_reply_body" class="input" rows="7">{{ s.commercial_reply_body or defaults.commercial_reply_body }}</textarea>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Enlace WhatsApp del email de respuesta (distinto del botón de la página)</label>
+      <input type="url" name="commercial_reply_whatsapp_url" class="input" value="{{ s.commercial_reply_whatsapp_url or '' }}" placeholder="https://chat.whatsapp.com/..."/>
+    </div>
+    <button type="submit" class="btn btn-primary">Guardar landing comercial</button>
+  </form>
+</div>
+{% include 'admin/_nav_footer.html' %}
+{% endblock %}

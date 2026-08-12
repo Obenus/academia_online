@@ -86,12 +86,30 @@ Las plantillas de email admiten variables como `{{username}}`, `{{email}}`, `{{p
 Edita todos los textos de la **página de conversión y acceso** (`/login`):
 
 - Titular, apertura emocional, qué es el círculo, beneficios, preguntas que se exploran, qué incluye, para quién es, cierre.
+- **Vídeo YouTube/Vimeo** (opcional) entre «Por qué nació» y «¿Qué es?». Si no hay URL, la sección no se muestra.
 - Texto del botón de suscripción y nota de precio.
 - Título y subtítulo del formulario de login.
 
 Usa **Restaurar textos del PDF** para volver a los textos originales de NuncaTanYo. Los párrafos se separan con una línea en blanco; las listas, con una línea por ítem.
 
 El precio mostrado en la landing **no se edita aquí**: viene de **Planes** y se aplica automáticamente según la ubicación de la visitante (España o internacional; si no se detecta, España).
+
+### Landing comercial (`/admin/landing-comercial`)
+
+Página pública de captación (por defecto `/oferta`; el slug es editable):
+
+- Activar/desactivar, título, texto Markdown, imagen, enlace WhatsApp de la página.
+- Email de notificación de cada lead + autorespuesta al visitante (asunto/cuerpo con `{{nombre}}`, `{{whatsapp_url}}`, etc.).
+- Enlace WhatsApp del email de respuesta (independiente del botón de la página).
+- Listado de leads y export CSV en **Leads**.
+
+### Textos legales (`/admin/legal`)
+
+Contenido Markdown de Política de la Comunidad, Privacidad, Cookies y Aviso Legal. URLs: `/legal/comunidad`, `/legal/privacidad`, `/legal/cookies`, `/legal/aviso-legal`. Enlaces permanentes en el footer de toda la plataforma (pestaña nueva).
+
+### Recuperación de contraseña
+
+En el login, «¿Has olvidado tu contraseña?» → `/recuperar-password`. Se envía un enlace único (1 h) al email de la cuenta.
 
 ### Publicar post
 
@@ -344,8 +362,9 @@ Tras regularizar en Stripe, el webhook `invoice.payment_succeeded` reactiva el a
 ## Documentación relacionada
 
 - [README.md](README.md) — visión general e instalación
+- [MANUAL_ACTUALIZACION_v2.2.0.md](MANUAL_ACTUALIZACION_v2.2.0.md) — novedades v2.2.0 y actualización sin pérdida de datos
 - [MANUAL_DESPLIEGUE.md](MANUAL_DESPLIEGUE.md) — despliegue en servidor, Railway, Docker
 
 ---
 
-*Versión de plataforma documentada: 2.1.0*
+*Versión de plataforma documentada: 2.2.0*

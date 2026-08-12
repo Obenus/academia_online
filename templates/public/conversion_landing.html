@@ -88,6 +88,22 @@
         {% endfor %}
       </section>
 
+      {% set landing_vid = site.landing_video_url or '' %}
+      {% if landing_vid.strip() %}
+      {% set embed = landing_vid|video_embed_public %}
+      {% if embed %}
+      <section class="conv-section">
+        <div class="relative w-full overflow-hidden rounded-2xl bg-black" style="padding-bottom:56.25%">
+          <iframe src="{{ embed }}" title="Vídeo"
+            class="absolute inset-0 w-full h-full border-0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen loading="lazy"
+            referrerpolicy="strict-origin-when-cross-origin"></iframe>
+        </div>
+      </section>
+      {% endif %}
+      {% endif %}
+
       <section class="conv-section">
         <h2>¿Qué es {{ landing_text(site, 'landing_title') }}?</h2>
         <div class="conv-prose">
@@ -167,11 +183,14 @@
           <input type="password" name="password" class="input" placeholder="Contraseña" required autocomplete="current-password"/>
           <button type="submit" class="conv-btn conv-btn-outline w-full">Iniciar sesión</button>
         </form>
+        <p class="text-center text-xs mt-3">
+          <a href="{{ url_for('password_forgot') }}" class="font-semibold conv-accent">¿Has olvidado tu contraseña?</a>
+        </p>
       </div>
     </aside>
   </div>
 
-  <section class="conv-card max-w-md mx-auto mt-10 lg:hidden" id="acceso">
+  <section class="conv-card max-w-md mx-auto mt-10 lg:hidden" id="acceso-mobile">
     <h2 class="conv-card-title">{{ landing_text(site, 'landing_login_title') }}</h2>
     <p class="text-sm text-center mb-4" style="color:var(--conv-muted)">{{ landing_text(site, 'landing_login_subtitle') }}</p>
     <form method="POST" action="{{ url_for('login') }}" class="space-y-3">
@@ -180,8 +199,13 @@
       <input type="password" name="password" class="input" placeholder="Contraseña" required autocomplete="current-password"/>
       <button type="submit" class="conv-btn conv-btn-outline w-full">Iniciar sesión</button>
     </form>
+    <p class="text-center text-xs mt-3">
+      <a href="{{ url_for('password_forgot') }}" class="font-semibold conv-accent">¿Has olvidado tu contraseña?</a>
+    </p>
   </section>
 </main>
+
+{% include 'includes/legal_footer.html' %}
 
 <script>
 document.querySelectorAll('.conv-plan').forEach(card => {

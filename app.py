@@ -20,7 +20,8 @@ from models import (db, User, Category, Post, Comment,
                     Course, Section, Lesson, LessonFile, LessonImage, Enrollment, LessonProgress, LiveClass,
                     SiteSettings, PointEvent, Notification, SubscriptionPlan,
                     Quiz, Assignment, PostReport, CourseCertificate, LiveClassCategory,
-                    CheckoutIntent, CalendarMonthTheme, LibraryItem, Resource, ResourceTag)
+                    CheckoutIntent, CalendarMonthTheme, LibraryItem, Resource, ResourceTag,
+                    CommercialLead, PasswordResetToken)
 from calendar_categories import ensure_calendar_categories, category_event_colors
 from community_categories import ensure_community_categories, category_by_slug
 from geo_utils import detect_billing_region, billing_region_label
@@ -43,7 +44,9 @@ from learning_utils import (
 from blueprints.features import bp as features_bp, register_bulk_email_routes, user_can_access_category
 from blueprints.library import bp as library_bp
 from blueprints.resources import bp as resources_bp
-from video_utils import video_thumbnail_url, video_embed_url
+from video_utils import video_thumbnail_url, video_embed_url, video_embed_url_public
+from markdown_utils import render_markdown
+from commercial_content import COMMERCIAL_DEFAULTS, normalize_slug
 from backup_manager import run_backup, encrypt_value, decrypt_value, list_local_backups, restore_backup
 from billing import (
     payments_enabled, get_stripe_secret, get_stripe_public, get_stripe_webhook_secret,
@@ -52,6 +55,7 @@ from billing import (
     send_admin_registration_email, notify_admins_payment_failed, user_payment_label,
     mark_whatsapp_vip_pending, video_embed_block,
     user_platform_access, process_stripe_webhook_event,
+    render_template_vars, send_html_email, email_wrapper,
 )
 
 app = Flask(__name__)
@@ -89,6 +93,7 @@ def video_embed_secure(url: str) -> str:
 
 app.jinja_env.filters['youtube_embed'] = youtube_embed
 app.jinja_env.filters['video_thumbnail'] = video_thumbnail_url
+app.jinja_env.filters['video_embed_public'] = video_embed_url_public
 
 def timeago(dt: datetime) -> str:
     diff = datetime.utcnow() - dt
@@ -112,7 +117,9 @@ _SUBSCRIPTION_EXEMPT_ENDPOINTS = frozenset({
     'checkout_start', 'checkout_success', 'checkout',
     'account_settings', 'features.billing_portal',
     'serve_avatar', 'serve_banner', 'serve_course_cover', 'serve_lesson_image',
-    'serve_file',
+    'serve_file', 'serve_commercial_landing_image',
+    'legal_page', 'commercial_landing', 'commercial_landing_oferta',
+    'password_forgot', 'password_reset',
 })
 
 _SUBSCRIPTION_EXEMPT_PREFIXES = ('/static/', '/webhooks/')
@@ -367,8 +374,76 @@ def login():
                 return render_template('public/conversion_landing.html', **ctx)
             login_user(user, remember=True)
             return redirect(request.args.get('next') or url_for('start_here'))
-        flash('Email o contraseña incorrectos.', 'error')
+        flash('Email o contraseña incorrectos. Si no recuerdas tu contraseña, usa «¿Has olvidado tu contraseña?».', 'error')
     return render_template('public/conversion_landing.html', **ctx)
+
+
+@app.route('/recuperar-password', methods=['GET', 'POST'])
+@limiter.limit('10 per hour')
+def password_forgot():
+    s = get_settings()
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        user = User.query.filter_by(email=email).first()
+        flash('Si el email está registrado, recibirás un enlace para restablecer tu contraseña.', 'success')
+        if user and user.status != 'rejected':
+            import secrets as _secrets
+            token = _secrets.token_urlsafe(32)
+            expires = datetime.utcnow() + timedelta(hours=1)
+            db.session.add(PasswordResetToken(
+                user_id=user.id, token=token, expires_at=expires,
+            ))
+            db.session.commit()
+            reset_url = url_for('password_reset', token=token, _external=True)
+            academy = s.academy_name or app.config.get('ACADEMY_NAME', 'Academia')
+            inner = (
+                f'<p>Hola <strong>{user.username}</strong>,</p>'
+                f'<p>Has solicitado restablecer tu contraseña. El enlace es válido durante 1 hora:</p>'
+                f'<p><a href="{reset_url}" style="display:inline-block;background:#7c3aed;color:#fff;'
+                f'padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">'
+                f'Cambiar contraseña</a></p>'
+                f'<p style="color:#71717a;font-size:12px">Si no has sido tú, ignora este mensaje.</p>'
+            )
+            try:
+                send_html_email(
+                    app, mail, [user.email],
+                    f'Restablecer contraseña — {academy}',
+                    email_wrapper(academy, inner),
+                )
+            except Exception as e:
+                print(f'[password-reset] email: {e}')
+        return redirect(url_for('password_forgot'))
+    return render_template('public/password_forgot.html', site=s)
+
+
+@app.route('/recuperar-password/<token>', methods=['GET', 'POST'])
+@limiter.limit('20 per hour')
+def password_reset(token):
+    s = get_settings()
+    row = PasswordResetToken.query.filter_by(token=token).first()
+    if not row or row.used_at or row.expires_at < datetime.utcnow():
+        flash('El enlace no es válido o ha caducado. Solicita uno nuevo.', 'error')
+        return redirect(url_for('password_forgot'))
+    user = User.query.get(row.user_id)
+    if not user:
+        flash('El enlace no es válido.', 'error')
+        return redirect(url_for('password_forgot'))
+    if request.method == 'POST':
+        pw = request.form.get('password', '')
+        pw2 = request.form.get('password2', '')
+        if len(pw) < 8:
+            flash('La contraseña debe tener al menos 8 caracteres.', 'error')
+            return render_template('public/password_reset.html', site=s, token=token)
+        if pw != pw2:
+            flash('Las contraseñas no coinciden.', 'error')
+            return render_template('public/password_reset.html', site=s, token=token)
+        user.set_password(pw)
+        row.used_at = datetime.utcnow()
+        db.session.commit()
+        flash('Contraseña actualizada. Ya puedes iniciar sesión.', 'success')
+        return redirect(url_for('login'))
+    return render_template('public/password_reset.html', site=s, token=token)
+
 
 def _finalize_registration_payment(user, plan, session_obj=None):
     """Tras pago Stripe: activar o dejar pendiente y enviar emails."""
@@ -1289,6 +1364,197 @@ def admin_landing():
     return render_template(
         'admin/landing.html', s=s, defaults=LANDING_DEFAULTS, fields=LANDING_FORM_FIELDS,
     )
+
+
+LEGAL_PAGES = {
+    'comunidad': ('legal_community_md', 'Política de la Comunidad'),
+    'privacidad': ('legal_privacy_md', 'Política de Privacidad'),
+    'cookies': ('legal_cookies_md', 'Política de Cookies'),
+    'aviso-legal': ('legal_notice_md', 'Aviso Legal'),
+}
+
+
+@app.route('/admin/legal', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_legal():
+    s = get_settings()
+    if request.method == 'POST':
+        s.legal_community_md = request.form.get('legal_community_md', '')
+        s.legal_privacy_md = request.form.get('legal_privacy_md', '')
+        s.legal_cookies_md = request.form.get('legal_cookies_md', '')
+        s.legal_notice_md = request.form.get('legal_notice_md', '')
+        db.session.commit()
+        flash('Textos legales guardados.', 'success')
+        return redirect(url_for('admin_legal'))
+    pages = [
+        ('legal_community_md', 'Política de la Comunidad', 'comunidad'),
+        ('legal_privacy_md', 'Política de Privacidad', 'privacidad'),
+        ('legal_cookies_md', 'Política de Cookies', 'cookies'),
+        ('legal_notice_md', 'Aviso Legal', 'aviso-legal'),
+    ]
+    values = {k: getattr(s, k, '') or '' for k, _, _ in pages}
+    return render_template('admin/legal.html', s=s, pages=pages, values=values)
+
+
+@app.route('/admin/landing-comercial', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_commercial_landing():
+    s = get_settings()
+    if request.method == 'POST':
+        s.commercial_landing_enabled = _is_true(request.form.get('commercial_landing_enabled'))
+        s.commercial_landing_slug = normalize_slug(request.form.get('commercial_landing_slug'), 'oferta')
+        s.commercial_landing_title = request.form.get('commercial_landing_title', '').strip()
+        s.commercial_landing_text = request.form.get('commercial_landing_text', '')
+        s.commercial_landing_whatsapp_url = request.form.get('commercial_landing_whatsapp_url', '').strip()
+        s.commercial_lead_notify_email = request.form.get('commercial_lead_notify_email', '').strip().lower()
+        s.commercial_reply_subject = request.form.get('commercial_reply_subject', '').strip()
+        s.commercial_reply_body = request.form.get('commercial_reply_body', '')
+        s.commercial_reply_whatsapp_url = request.form.get('commercial_reply_whatsapp_url', '').strip()
+        img = request.files.get('commercial_landing_image')
+        if img and img.filename:
+            try:
+                data, mime = _compress_image(img, max_w=1600, max_h=900, quality=82)
+                s.commercial_landing_image_data = data
+                s.commercial_landing_image_mime = mime
+            except Exception as e:
+                flash(f'No se pudo procesar la imagen: {e}', 'error')
+        db.session.commit()
+        flash('Landing comercial guardada.', 'success')
+        return redirect(url_for('admin_commercial_landing'))
+    return render_template(
+        'admin/commercial_landing.html', s=s, defaults=COMMERCIAL_DEFAULTS,
+    )
+
+
+@app.route('/admin/landing-comercial/leads')
+@login_required
+@admin_required
+def admin_commercial_leads():
+    leads = CommercialLead.query.order_by(CommercialLead.created_at.desc()).all()
+    return render_template('admin/commercial_leads.html', leads=leads)
+
+
+@app.route('/admin/landing-comercial/leads.csv')
+@login_required
+@admin_required
+def admin_commercial_leads_csv():
+    import csv
+    import io
+    leads = CommercialLead.query.order_by(CommercialLead.created_at.desc()).all()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(['fecha', 'nombre', 'email'])
+    for lead in leads:
+        w.writerow([
+            lead.created_at.strftime('%Y-%m-%d %H:%M:%S') if lead.created_at else '',
+            lead.name,
+            lead.email,
+        ])
+    resp = make_response(buf.getvalue())
+    resp.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    resp.headers['Content-Disposition'] = 'attachment; filename=leads_comerciales.csv'
+    return resp
+
+
+@app.route('/landing-comercial/imagen')
+def serve_commercial_landing_image():
+    s = get_settings()
+    if not s or not s.commercial_landing_image_data:
+        abort(404)
+    return send_file(
+        io.BytesIO(s.commercial_landing_image_data),
+        mimetype=s.commercial_landing_image_mime or 'image/jpeg',
+    )
+
+
+@app.route('/legal/<page>')
+def legal_page(page):
+    if page not in LEGAL_PAGES:
+        abort(404)
+    field, title = LEGAL_PAGES[page]
+    s = get_settings()
+    raw = getattr(s, field, '') or ''
+    return render_template(
+        'public/legal_page.html',
+        site=s,
+        page_title=title,
+        content_html=render_markdown(raw),
+    )
+
+
+def _render_commercial_landing():
+    s = get_settings()
+    if not s.commercial_landing_enabled:
+        abort(404)
+    text = (s.commercial_landing_text or '').strip() or COMMERCIAL_DEFAULTS['commercial_landing_text']
+    if request.method == 'POST':
+        # honeypot
+        if request.form.get('website'):
+            flash('Gracias. Revisa tu email.', 'success')
+            return redirect(request.path)
+        name = request.form.get('name', '').strip()[:200]
+        email = request.form.get('email', '').strip().lower()[:120]
+        privacy = request.form.get('privacy')
+        if not name or not email or not privacy:
+            flash('Completa nombre, email y acepta la política de privacidad.', 'error')
+            return redirect(request.path)
+        lead = CommercialLead(name=name, email=email, privacy_accepted=True)
+        db.session.add(lead)
+        db.session.commit()
+
+        academy = s.academy_name or app.config.get('ACADEMY_NAME', 'Academia')
+        reply_wa = (s.commercial_reply_whatsapp_url or '').strip()
+        subject_tpl = (s.commercial_reply_subject or '').strip() or COMMERCIAL_DEFAULTS['commercial_reply_subject']
+        body_tpl = (s.commercial_reply_body or '').strip() or COMMERCIAL_DEFAULTS['commercial_reply_body']
+        ctx = {
+            'nombre': name,
+            'email': email,
+            'whatsapp_url': reply_wa or '#',
+            'academy_name': academy,
+        }
+        try:
+            subject = render_template_vars(subject_tpl, **ctx)
+            inner = render_template_vars(body_tpl, **ctx)
+            send_html_email(app, mail, [email], subject, email_wrapper(academy, inner))
+        except Exception as e:
+            print(f'[commercial] reply email: {e}')
+
+        notify_to = (s.commercial_lead_notify_email or '').strip()
+        if notify_to:
+            try:
+                admin_inner = (
+                    f'<p>Nuevo lead en la landing comercial:</p>'
+                    f'<ul><li><strong>Nombre:</strong> {name}</li>'
+                    f'<li><strong>Email:</strong> {email}</li></ul>'
+                )
+                send_html_email(
+                    app, mail, [notify_to],
+                    f'Lead comercial: {name}',
+                    email_wrapper(academy, admin_inner),
+                )
+            except Exception as e:
+                print(f'[commercial] notify email: {e}')
+
+        flash('¡Gracias! Te hemos enviado un email con la información.', 'success')
+        return redirect(request.path)
+
+    return render_template(
+        'public/commercial_landing.html',
+        s=s,
+        text_html=render_markdown(text),
+    )
+
+
+@app.route('/oferta', methods=['GET', 'POST'])
+@limiter.limit('30 per hour')
+def commercial_landing_oferta():
+    s = get_settings()
+    slug = normalize_slug(getattr(s, 'commercial_landing_slug', None), 'oferta')
+    if slug != 'oferta':
+        return redirect(f'/{slug}', code=302)
+    return _render_commercial_landing()
 
 
 @app.route('/admin/backups', methods=['GET', 'POST'])
@@ -4378,6 +4644,21 @@ Cursos:          {course_count}
 </pre><a href="{url_for("admin_dashboard")}">← Volver al panel</a>'''
 
 # Inicializar BD siempre (tanto con gunicorn como directo)
+
+@app.route('/<slug>', methods=['GET', 'POST'])
+@limiter.limit('30 per hour')
+def commercial_landing(slug):
+    """Slug editable de la landing comercial (p. ej. /oferta o /promo)."""
+    import re as _re
+    if not _re.fullmatch(r'[a-z0-9\-]+', slug or ''):
+        abort(404)
+    s = get_settings()
+    expected = normalize_slug(getattr(s, 'commercial_landing_slug', None), 'oferta')
+    if slug != expected:
+        abort(404)
+    return _render_commercial_landing()
+
+
 with app.app_context():
     try:
         db.create_all()
@@ -4441,6 +4722,42 @@ with app.app_context():
             conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_price_note VARCHAR(200) DEFAULT ''"))
             conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_title VARCHAR(200) DEFAULT ''"))
             conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_subtitle VARCHAR(300) DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_url VARCHAR(500) DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_community_md TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_privacy_md TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_cookies_md TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_notice_md TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_enabled BOOLEAN DEFAULT FALSE"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_slug VARCHAR(80) DEFAULT 'oferta'"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_title VARCHAR(200) DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_text TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_whatsapp_url VARCHAR(500) DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_image_data BYTEA"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_image_mime VARCHAR(50) DEFAULT 'image/jpeg'"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_lead_notify_email VARCHAR(200) DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_subject VARCHAR(300) DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_body TEXT DEFAULT ''"))
+            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_whatsapp_url VARCHAR(500) DEFAULT ''"))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS commercial_lead (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(200) NOT NULL,
+                    email VARCHAR(120) NOT NULL,
+                    privacy_accepted BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS password_reset_token (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+                    token VARCHAR(64) UNIQUE NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    expires_at TIMESTAMP NOT NULL,
+                    used_at TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_password_reset_token_token ON password_reset_token(token)"))
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS subscription_plan (
                     id SERIAL PRIMARY KEY,

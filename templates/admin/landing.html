@@ -32,6 +32,12 @@
     </div>
 
     <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Vídeo (YouTube o Vimeo) — entre «Por qué nació» y «¿Qué es?»</label>
+      <input type="url" name="landing_video_url" class="input" value="{{ s.landing_video_url or '' }}" placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…"/>
+      <p class="text-[11px] mt-1" style="color:var(--text4)">Si está vacío, la sección no se muestra en la landing.</p>
+    </div>
+
+    <div>
       <label class="block text-xs font-medium mb-1" style="color:var(--text3)">¿Qué es? (no es terapia, es un círculo…)</label>
       <textarea name="landing_what_is" class="input" rows="8">{{ s.landing_what_is or defaults.landing_what_is }}</textarea>
     </div>

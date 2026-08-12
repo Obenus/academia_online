@@ -310,6 +310,22 @@ class SiteSettings(db.Model):
     landing_price_note           = db.Column(db.String(200), default='')
     landing_login_title          = db.Column(db.String(200), default='')
     landing_login_subtitle       = db.Column(db.String(300), default='')
+    landing_video_url            = db.Column(db.String(500), default='')
+    legal_community_md           = db.Column(db.Text, default='')
+    legal_privacy_md             = db.Column(db.Text, default='')
+    legal_cookies_md             = db.Column(db.Text, default='')
+    legal_notice_md              = db.Column(db.Text, default='')
+    commercial_landing_enabled   = db.Column(db.Boolean, default=False)
+    commercial_landing_slug      = db.Column(db.String(80), default='oferta')
+    commercial_landing_title     = db.Column(db.String(200), default='')
+    commercial_landing_text      = db.Column(db.Text, default='')
+    commercial_landing_whatsapp_url = db.Column(db.String(500), default='')
+    commercial_landing_image_data = db.Column(db.LargeBinary, nullable=True)
+    commercial_landing_image_mime = db.Column(db.String(50), default='image/jpeg')
+    commercial_lead_notify_email = db.Column(db.String(200), default='')
+    commercial_reply_subject     = db.Column(db.String(300), default='')
+    commercial_reply_body        = db.Column(db.Text, default='')
+    commercial_reply_whatsapp_url = db.Column(db.String(500), default='')
     welcome_video_url            = db.Column(db.String(500), default='')
     how_it_works_video_url       = db.Column(db.String(500), default='')
     start_page_intro             = db.Column(db.Text, default='')
@@ -517,3 +533,23 @@ class CourseCertificate(db.Model):
     issued_at        = db.Column(db.DateTime, default=datetime.utcnow)
     user             = db.relationship('User', backref='certificates', lazy=True)
     course           = db.relationship('Course', backref='certificates', lazy=True)
+
+
+class CommercialLead(db.Model):
+    __tablename__ = 'commercial_lead'
+    id         = db.Column(db.Integer, primary_key=True)
+    name       = db.Column(db.String(200), nullable=False)
+    email      = db.Column(db.String(120), nullable=False)
+    privacy_accepted = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class PasswordResetToken(db.Model):
+    __tablename__ = 'password_reset_token'
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    token      = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at    = db.Column(db.DateTime, nullable=True)
+    user       = db.relationship('User', backref='password_reset_tokens', lazy=True)

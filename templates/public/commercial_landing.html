@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>{{ s.commercial_landing_title or 'Oferta' }} — {{ s.academy_name or academy_name }}</title>
+<script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/theme.css"/>
+<style>
+  :root { --c-accent: var(--color-primary, #7c3aed); }
+  body { background:#faf8f6; color:#2d2a26; font-family:'Segoe UI',system-ui,sans-serif; margin:0; line-height:1.65; }
+  .wrap { max-width:560px; margin:0 auto; padding:2rem 1rem 3rem; }
+  .hero-img { width:100%; border-radius:16px; object-fit:cover; max-height:280px; margin-bottom:1.5rem; }
+  .card { background:#fff; border:1px solid #ebe6e1; border-radius:20px; padding:1.5rem; box-shadow:0 8px 30px rgba(45,42,38,.06); }
+  .prose h1,.prose h2 { font-weight:700; margin:1rem 0 .75rem; }
+  .prose p { color:#6b6560; margin-bottom:.75rem; }
+  .input { background:#fff; border:1px solid #d4d0cb; border-radius:10px; padding:.7rem .9rem; font-size:.9rem; width:100%; box-sizing:border-box; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; width:100%; padding:.85rem 1.5rem; border-radius:12px; font-weight:700; border:none; cursor:pointer; background:var(--c-accent); color:#fff; }
+  .btn-wa { background:#25D366; margin-bottom:1rem; text-decoration:none; }
+  .check { display:flex; gap:.5rem; align-items:flex-start; font-size:.8rem; color:#6b6560; }
+  .check a { color:var(--c-accent); }
+</style>
+{% if brand_style %}<style>:root{ {{ brand_style }} }</style>{% endif %}
+</head>
+<body>
+<div class="wrap">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="mb-4 space-y-2">
+    {% for cat, msg in messages %}
+    <div class="px-4 py-3 rounded-xl text-sm border {% if cat=='error' %}bg-red-50 border-red-200 text-red-700{% else %}bg-green-50 border-green-200 text-green-700{% endif %}">{{ msg }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  {% if s.commercial_landing_image_data %}
+  <img src="{{ url_for('serve_commercial_landing_image') }}" alt="" class="hero-img"/>
+  {% endif %}
+
+  <h1 class="text-2xl font-extrabold mb-4">{{ s.commercial_landing_title or 'Oferta' }}</h1>
+
+  {% if text_html %}
+  <div class="prose mb-6">{{ text_html }}</div>
+  {% endif %}
+
+  {% if s.commercial_landing_whatsapp_url %}
+  <a href="{{ s.commercial_landing_whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-wa">Abrir canal de WhatsApp</a>
+  {% endif %}
+
+  <div class="card">
+    <h2 class="font-bold text-lg mb-4 text-center">Déjanos tus datos</h2>
+    <form method="POST" class="space-y-3">
+      {% include 'includes/csrf_field.html' %}
+      <input type="text" name="website" value="" class="hidden" tabindex="-1" autocomplete="off" aria-hidden="true"/>
+      <div>
+        <label class="block text-xs font-medium mb-1 text-zinc-500">Nombre</label>
+        <input type="text" name="name" class="input" required maxlength="200" autocomplete="name"/>
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1 text-zinc-500">Email</label>
+        <input type="email" name="email" class="input" required maxlength="120" autocomplete="email"/>
+      </div>
+      <label class="check">
+        <input type="checkbox" name="privacy" value="1" required class="mt-1"/>
+        <span>He leído y acepto la
+          <a href="{{ url_for('legal_page', page='privacidad') }}" target="_blank" rel="noopener noreferrer">Política de Privacidad</a>.
+        </span>
+      </label>
+      <button type="submit" class="btn">Enviar</button>
+    </form>
+  </div>
+</div>
+{% include 'includes/legal_footer.html' %}
+</body>
+</html>

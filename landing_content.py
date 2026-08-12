@@ -98,7 +98,7 @@ Un lugar donde volver a ti.''',
 
 
 LANDING_FORM_FIELDS = [
-    'landing_title', 'landing_hook', 'landing_intro', 'landing_what_is',
+    'landing_title', 'landing_hook', 'landing_intro', 'landing_video_url', 'landing_what_is',
     'landing_how_helps', 'landing_explore_questions', 'landing_includes',
     'landing_for_you', 'landing_closing', 'landing_cta_text', 'landing_price_note',
     'landing_login_title', 'landing_login_subtitle',

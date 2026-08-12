@@ -2,7 +2,7 @@
 
 Plataforma web de academia y comunidad de suscripción construida con **Flask** y **PostgreSQL**. Incluye landing de conversión, biblioteca de vídeo, foro, calendario de encuentros, recursos descargables, panel de administración, pagos por suscripción con **Stripe** (precios España/internacional automáticos), backups automáticos y despliegue con **Docker**.
 
-**Versión actual:** `v2.1.0`
+**Versión actual:** `v2.2.0`
 
 Repositorio: [github.com/Obenus/academia_online](https://github.com/Obenus/academia_online)
 
@@ -24,7 +24,15 @@ Repositorio: [github.com/Obenus/academia_online](https://github.com/Obenus/acade
 
 ---
 
+## Novedades v2.2.0
+
+- Vídeo YouTube/Vimeo opcional en la landing principal (entre «Por qué nació» y «¿Qué es?»).
+- Textos legales editables (Comunidad, Privacidad, Cookies, Aviso Legal) en Markdown, con footer en todas las páginas.
+- **Landing comercial** (`/oferta` o slug editable): imagen, texto, WhatsApp, formulario nombre/email, leads en admin + CSV, autorespuesta por email.
+- Recuperación de contraseña por enlace único enviado por email.
+
 ## Novedades v2.0.0
+
 
 ### Experiencia pública
 
@@ -210,6 +218,9 @@ Ruta base: `/admin` (rol `admin`).
 | Dashboard | `/admin` |
 | Ajustes y marca | `/admin/ajustes` |
 | Landing principal | `/admin/landing` |
+| Landing comercial | `/admin/landing-comercial` |
+| Leads comerciales | `/admin/landing-comercial/leads` |
+| Textos legales | `/admin/legal` |
 | Biblioteca | `/admin/biblioteca` |
 | Recursos | `/admin/recursos` |
 | Cursos (legacy) | `/admin/cursos` |
@@ -260,6 +271,7 @@ docker compose logs -f backup
 | Documento | Contenido |
 |-----------|-----------|
 | [MANUAL_ADMINISTRADOR.md](MANUAL_ADMINISTRADOR.md) | Uso del panel admin, flujos, webhooks |
+| [MANUAL_ACTUALIZACION_v2.2.0.md](MANUAL_ACTUALIZACION_v2.2.0.md) | Novedades v2.2.0 y cómo actualizar producción |
 | [MANUAL_DESPLIEGUE.md](MANUAL_DESPLIEGUE.md) | Instalación en servidor, Railway, Stripe, email |
 
 ---

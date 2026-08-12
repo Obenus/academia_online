@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>{{ page_title }} — {{ site.academy_name or academy_name }}</title>
+<script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/theme.css"/>
+<style>
+  body { background:#faf8f6; color:#2d2a26; font-family:'Segoe UI',system-ui,sans-serif; margin:0; line-height:1.65; }
+  .legal-wrap { max-width:720px; margin:0 auto; padding:2rem 1rem 3rem; }
+  .legal-prose h1 { font-size:1.75rem; font-weight:800; margin-bottom:1.25rem; }
+  .legal-prose h2 { font-size:1.25rem; font-weight:700; margin:1.5rem 0 .75rem; }
+  .legal-prose h3 { font-size:1.05rem; font-weight:600; margin:1.25rem 0 .5rem; }
+  .legal-prose p, .legal-prose li { color:#6b6560; margin-bottom:.75rem; }
+  .legal-prose ul, .legal-prose ol { padding-left:1.25rem; margin-bottom:1rem; }
+  .legal-prose a { color:var(--color-primary,#7c3aed); }
+  .back { display:inline-block; margin-bottom:1.5rem; font-size:.875rem; font-weight:600; color:var(--color-primary,#7c3aed); text-decoration:none; }
+</style>
+{% if brand_style %}<style>:root{ {{ brand_style }} }</style>{% endif %}
+</head>
+<body>
+<div class="legal-wrap">
+  <a class="back" href="javascript:window.close();" onclick="if(history.length>1){history.back();return false;}">← Cerrar</a>
+  <article class="legal-prose">
+    <h1>{{ page_title }}</h1>
+    {% if content_html %}
+    {{ content_html }}
+    {% else %}
+    <p>Esta página aún no tiene contenido. El administrador puede editarla en el panel.</p>
+    {% endif %}
+  </article>
+</div>
+{% include 'includes/legal_footer.html' %}
+</body>
+</html>

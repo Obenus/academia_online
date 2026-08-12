@@ -1,0 +1,9 @@
+{# Footer legal — enlaces en pestaña nueva #}
+<footer class="legal-footer text-center text-xs py-6 px-4" style="color:var(--text4, #6b6560);border-top:1px solid var(--border, #ebe6e1);margin-top:2rem">
+  <nav class="flex flex-wrap justify-center gap-x-4 gap-y-2">
+    <a href="{{ url_for('legal_page', page='comunidad') }}" target="_blank" rel="noopener noreferrer" class="hover:underline">Política de la Comunidad</a>
+    <a href="{{ url_for('legal_page', page='privacidad') }}" target="_blank" rel="noopener noreferrer" class="hover:underline">Política de Privacidad</a>
+    <a href="{{ url_for('legal_page', page='cookies') }}" target="_blank" rel="noopener noreferrer" class="hover:underline">Política de Cookies</a>
+    <a href="{{ url_for('legal_page', page='aviso-legal') }}" target="_blank" rel="noopener noreferrer" class="hover:underline">Aviso Legal</a>
+  </nav>
+</footer>

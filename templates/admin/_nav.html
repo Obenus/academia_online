@@ -51,6 +51,8 @@
       <p class="admin-nav-label">Comunidad</p>
       <a href="{{ url_for('admin_settings') }}" class="admin-nav-link {% if ep=='admin_settings' %}active{% endif %}">⚙️ Ajustes y marca</a>
       <a href="{{ url_for('admin_landing') }}" class="admin-nav-link {% if ep=='admin_landing' %}active{% endif %}">🌸 Landing principal</a>
+      <a href="{{ url_for('admin_commercial_landing') }}" class="admin-nav-link {% if ep in ('admin_commercial_landing','admin_commercial_leads') %}active{% endif %}">📣 Landing comercial</a>
+      <a href="{{ url_for('admin_legal') }}" class="admin-nav-link {% if ep=='admin_legal' %}active{% endif %}">📜 Textos legales</a>
       <a href="{{ url_for('new_post') }}" class="admin-nav-link {% if ep=='new_post' %}active{% endif %}">✏️ Publicar post</a>
       <a href="{{ url_for('features.admin_moderation') }}" class="admin-nav-link {% if ep=='features.admin_moderation' %}active{% endif %}">
         🛡 Moderación
