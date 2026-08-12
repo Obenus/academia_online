@@ -6,13 +6,39 @@ from urllib.parse import quote
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, jsonify, Response
 from flask_login import login_required, current_user
 
-from models import db, LibraryItem, LiveClass, Course
-from video_utils import video_embed_url, video_thumbnail_url, video_provider, youtube_video_id
+from models import db, LibraryItem, LiveClass, Course, SiteSettings
+from video_utils import video_embed_url, video_thumbnail_url, video_provider, youtube_video_id, vimeo_oembed_thumbnail
 
 bp = Blueprint('library', __name__)
 
 MONTH_NAMES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+
+@bp.app_template_global('video_thumb')
+def video_thumb(url):
+    """URL directa de miniatura (CDN YouTube/Vumbnail). Evita saturar Gunicorn."""
+    return video_thumbnail_url(url) or ''
+
+
+def _sort_library_items(items):
+    """Orden manual primero (menor = antes); si empatan, el más reciente."""
+    return sorted(
+        items,
+        key=lambda i: (
+            int(i.sort_order or 0),
+            -(i.created_at.timestamp() if i.created_at else 0),
+            -i.id,
+        ),
+    )
+
+
+def _next_first_sort_order():
+    """Asigna un orden menor que el mínimo actual → el nuevo vídeo queda el primero."""
+    m = db.session.query(db.func.min(LibraryItem.sort_order)).scalar()
+    if m is None:
+        return 0
+    return int(m) - 1
 
 
 def admin_required(f):
@@ -28,6 +54,35 @@ def _course_title_from_item(item):
     if item.description and ' — ' in item.description:
         return item.description.split(' — ', 1)[0].strip()
     return ''
+
+
+def _catalog_card_key(card):
+    if card.get('kind') == 'encuentros':
+        return 'encuentros'
+    if card.get('kind') == 'course' and card.get('course'):
+        return f"c:{card['course'].id}"
+    return f"g:{card.get('title') or ''}"
+
+
+def _apply_catalog_order(cards, order_raw):
+    """Ordena tarjetas según library_catalog_order; las nuevas van al final."""
+    if not order_raw or not str(order_raw).strip():
+        return cards
+    keys = [k.strip() for k in str(order_raw).splitlines() if k.strip()]
+    if not keys:
+        return cards
+    by_key = {}
+    for card in cards:
+        key = _catalog_card_key(card)
+        card['key'] = key
+        by_key[key] = card
+    ordered = []
+    for key in keys:
+        card = by_key.pop(key, None)
+        if card:
+            ordered.append(card)
+    ordered.extend(by_key.values())
+    return ordered
 
 
 def _build_catalog():
@@ -47,7 +102,6 @@ def _build_catalog():
             by_title[item.title].append(item)
 
     cards = []
-    courses = {c.title: c for c in Course.query.all()}
     seen = set()
 
     for course in Course.query.order_by(Course.order, Course.id).all():
@@ -86,30 +140,88 @@ def _build_catalog():
             'slug': 'encuentros',
         })
 
+    for card in cards:
+        card['key'] = _catalog_card_key(card)
+
+    site = SiteSettings.query.first()
+    order_raw = getattr(site, 'library_catalog_order', None) if site else None
+    cards = _apply_catalog_order(cards, order_raw)
+
     return cards, by_title, encuentros
 
 
 def _items_for_slug(slug, by_title, encuentros):
+    """Devuelve ítems respetando Orden (menor número = primero)."""
     if slug == 'encuentros':
-        return sorted(encuentros, key=lambda i: (i.year, i.month, i.sort_order), reverse=True)
+        return _sort_library_items(encuentros)
     if slug.isdigit():
         course = Course.query.get(int(slug))
         if not course:
             abort(404)
-        return LibraryItem.query.filter(
-            LibraryItem.is_published == True,
+        items = LibraryItem.query.filter(
+            LibraryItem.is_published == True,  # noqa: E712
             LibraryItem.description.like(f'{course.title} —%'),
-        ).order_by(LibraryItem.sort_order, LibraryItem.id).all()
+        ).all()
+        return _sort_library_items(items)
     from urllib.parse import unquote
     title = unquote(slug)
-    return sorted(by_title.get(title, []), key=lambda i: (i.sort_order, i.id))
+    return _sort_library_items(by_title.get(title, []))
 
 
 @bp.route('/biblioteca')
 @login_required
 def index():
     cards, by_title, encuentros = _build_catalog()
+    # Miniatura del primer vídeo según orden manual (cuando no hay portada de curso)
+    for card in cards:
+        card['thumb_url'] = ''
+        first = None
+        if card['kind'] == 'encuentros' and encuentros:
+            ordered = _sort_library_items(encuentros)
+            first = ordered[0] if ordered else None
+        elif card['kind'] in ('course', 'group'):
+            ordered = _sort_library_items(by_title.get(card['title'], []))
+            first = ordered[0] if ordered else None
+        if first and first.video_url:
+            card['thumb_url'] = video_thumbnail_url(first.video_url) or ''
     return render_template('library/index.html', cards=cards)
+
+
+@bp.route('/biblioteca/reordenar', methods=['POST'])
+@login_required
+@admin_required
+def catalog_reorder():
+    """Reordena las tarjetas del catálogo /biblioteca (admin)."""
+    raw = (request.json or {}).get('order') or []
+    if not isinstance(raw, list):
+        abort(400)
+    keys = []
+    for key in raw:
+        if not isinstance(key, str):
+            continue
+        key = key.strip()
+        if key:
+            keys.append(key)
+
+    site = SiteSettings.query.first()
+    if not site:
+        site = SiteSettings()
+        db.session.add(site)
+    site.library_catalog_order = '\n'.join(keys)
+
+    # Mantener /cursos alineado con el orden de formaciones arrastradas aquí
+    course_ids = []
+    for key in keys:
+        if key.startswith('c:'):
+            try:
+                course_ids.append(int(key[2:]))
+            except ValueError:
+                continue
+    for i, cid in enumerate(course_ids):
+        Course.query.filter_by(id=cid).update({'order': i})
+
+    db.session.commit()
+    return ('', 204)
 
 
 @bp.route('/biblioteca/ver/<int:item_id>')
@@ -164,23 +276,70 @@ def play_api(item_id):
     return jsonify(payload)
 
 
+# Caché simple de miniaturas (evita saturar workers en listados)
+_THUMB_CACHE = {}
+_THUMB_CACHE_MAX = 200
+
+
 @bp.route('/biblioteca/api/miniatura/<int:item_id>')
 @login_required
 def thumbnail(item_id):
-    """Miniatura vía servidor — no expone el ID de YouTube/Vimeo en la URL del navegador."""
+    """Miniatura rápida: YouTube por redirect CDN; Vimeo con caché y timeout corto."""
     import urllib.request
-    item = LibraryItem.query.filter_by(id=item_id, is_published=True).first_or_404()
+    from flask import redirect as flask_redirect
+
+    q = LibraryItem.query.filter_by(id=item_id)
+    if not current_user.is_admin:
+        q = q.filter_by(is_published=True)
+    item = q.first_or_404()
+    if not item.video_url:
+        abort(404)
+
+    provider = video_provider(item.video_url)
     remote = video_thumbnail_url(item.video_url)
+
+    # YouTube: redirect directo al CDN (no bloquea Gunicorn)
+    if provider == 'youtube' and remote:
+        return flask_redirect(remote, code=302)
+
+    cache_key = f'{item.id}:{item.video_url}'
+    cached = _THUMB_CACHE.get(cache_key)
+    if cached:
+        data, ctype = cached
+        return Response(data, mimetype=ctype, headers={'Cache-Control': 'private, max-age=86400'})
+
+    if provider == 'vimeo' and not remote:
+        remote = vimeo_oembed_thumbnail(item.video_url)
+
     if not remote:
         abort(404)
-    try:
-        req = urllib.request.Request(remote, headers={'User-Agent': 'MiAcademia/1.0'})
-        with urllib.request.urlopen(req, timeout=12) as resp:
-            data = resp.read()
+
+    def _fetch(url, timeout=3):
+        req = urllib.request.Request(url, headers={'User-Agent': 'MiAcademia/1.0'})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read()
             ctype = resp.headers.get('Content-Type', 'image/jpeg').split(';')[0]
-        return Response(data, mimetype=ctype, headers={'Cache-Control': 'private, max-age=3600'})
+            return body, ctype
+
+    try:
+        data, ctype = _fetch(remote)
     except Exception:
-        abort(404)
+        if provider == 'vimeo':
+            alt = vimeo_oembed_thumbnail(item.video_url)
+            if alt and alt != remote:
+                try:
+                    data, ctype = _fetch(alt)
+                except Exception:
+                    abort(404)
+            else:
+                abort(404)
+        else:
+            abort(404)
+
+    if len(_THUMB_CACHE) >= _THUMB_CACHE_MAX:
+        _THUMB_CACHE.clear()
+    _THUMB_CACHE[cache_key] = (data, ctype)
+    return Response(data, mimetype=ctype, headers={'Cache-Control': 'private, max-age=86400'})
 
 
 @bp.route('/biblioteca/<slug>')
@@ -223,9 +382,76 @@ def course_view(slug):
 @admin_required
 def admin_list():
     items = LibraryItem.query.order_by(
-        LibraryItem.year.desc(), LibraryItem.month.desc(), LibraryItem.sort_order
+        LibraryItem.sort_order.asc(),
+        LibraryItem.created_at.desc(),
+        LibraryItem.id.desc(),
     ).all()
-    return render_template('admin/library.html', items=items, month_names=MONTH_NAMES)
+    return render_template(
+        'admin/library.html',
+        items=items,
+        month_names=MONTH_NAMES,
+    )
+
+
+@bp.route('/admin/biblioteca/reordenar', methods=['POST'])
+@login_required
+@admin_required
+def admin_reorder():
+    """Guarda el orden tras arrastrar (mismo patrón que /admin/cursos/reordenar).
+
+    Acepta la lista completa (admin) o un subconjunto (vista de una formación):
+    en ese caso se reordenan solo esos ítems manteniendo el resto en su sitio.
+    """
+    raw = (request.json or {}).get('order') or []
+    if not isinstance(raw, list) or not raw:
+        abort(400)
+    order_ids = []
+    for item_id in raw:
+        try:
+            order_ids.append(int(item_id))
+        except (TypeError, ValueError):
+            continue
+    if not order_ids:
+        abort(400)
+
+    order_set = set(order_ids)
+    if len(order_set) != len(order_ids):
+        abort(400)
+
+    all_items = LibraryItem.query.order_by(
+        LibraryItem.sort_order.asc(),
+        LibraryItem.created_at.desc(),
+        LibraryItem.id.desc(),
+    ).all()
+    known = {i.id for i in all_items}
+    if not order_set.issubset(known):
+        abort(400)
+
+    it = iter(order_ids)
+    new_ids = []
+    for item in all_items:
+        if item.id in order_set:
+            new_ids.append(next(it))
+        else:
+            new_ids.append(item.id)
+
+    for i, iid in enumerate(new_ids):
+        LibraryItem.query.filter_by(id=iid).update({'sort_order': i})
+    db.session.commit()
+    return ('', 204)
+
+
+@bp.route('/admin/biblioteca/<int:item_id>/orden', methods=['POST'])
+@login_required
+@admin_required
+def admin_set_order(item_id):
+    """Ajusta el orden (+1 / -1). Menor número = más arriba."""
+    item = LibraryItem.query.get_or_404(item_id)
+    delta = request.form.get('delta', type=int) or 0
+    item.sort_order = int(item.sort_order or 0) + delta
+    db.session.commit()
+    flash(f'Orden de «{item.title}» → {item.sort_order}', 'success')
+    return redirect(url_for('library.admin_list'))
 
 
 @bp.route('/admin/biblioteca/nuevo', methods=['GET', 'POST'])
@@ -233,6 +459,7 @@ def admin_list():
 @admin_required
 def admin_new():
     if request.method == 'POST':
+        # Nuevo vídeo siempre al principio; luego se puede reordenar a mano
         item = LibraryItem(
             title=request.form.get('title', '').strip(),
             description=request.form.get('description', '').strip(),
@@ -240,7 +467,7 @@ def admin_new():
             year=int(request.form.get('year', 2026)),
             month=int(request.form.get('month', 1)),
             item_type=request.form.get('item_type', 'extra'),
-            sort_order=int(request.form.get('sort_order', 0) or 0),
+            sort_order=_next_first_sort_order(),
             is_published=request.form.get('is_published') == 'on',
             live_class_id=request.form.get('live_class_id', type=int) or None,
         )
@@ -249,7 +476,7 @@ def admin_new():
         else:
             db.session.add(item)
             db.session.commit()
-            flash('Elemento añadido a la biblioteca.', 'success')
+            flash('Elemento añadido al principio de la biblioteca. Puedes cambiar el orden arrastrando.', 'success')
             return redirect(url_for('library.admin_list'))
     classes = LiveClass.query.order_by(LiveClass.scheduled_at.desc()).limit(50).all()
     return render_template('admin/library_form.html', item=None, classes=classes, month_names=MONTH_NAMES)
@@ -314,6 +541,7 @@ def upsert_recording_from_webhook(live_class_id, recording_url, title=None, year
         item_type='encuentro',
         live_class_id=live_class_id,
         is_published=True,
+        sort_order=_next_first_sort_order(),
     )
     db.session.add(item)
     db.session.commit()

@@ -16,53 +16,56 @@ def _window(now, hours_ahead, tolerance_min=15):
 
 def run_once():
     with app.app_context():
-        if not _mail_configured(app):
-            print('[reminder] MAIL no configurado, omitiendo.')
-            return
-        site = SiteSettings.query.first()
-        base = app.config.get('PUBLIC_BASE_URL', '').strip().rstrip('/')
-        if base:
-            calendar_url = f'{base}/calendario'
-        else:
-            from flask import url_for
-            with app.test_request_context('/'):
-                calendar_url = url_for('calendar', _external=True)
+        try:
+            if not _mail_configured(app):
+                print('[reminder] MAIL no configurado, omitiendo.')
+                return
+            site = SiteSettings.query.first()
+            base = app.config.get('PUBLIC_BASE_URL', '').strip().rstrip('/')
+            if base:
+                calendar_url = f'{base}/calendario'
+            else:
+                from flask import url_for
+                with app.test_request_context('/'):
+                    calendar_url = url_for('calendar', _external=True)
 
-        now = datetime.utcnow()
-        users = User.query.filter_by(status='active').filter(User.role != 'rejected').all()
-        classes = LiveClass.query.filter(LiveClass.scheduled_at > now).all()
+            now = datetime.utcnow()
+            users = User.query.filter_by(status='active').filter(User.role != 'rejected').all()
+            classes = LiveClass.query.filter(LiveClass.scheduled_at > now).all()
 
-        reminder_enabled = {
-            '24h': not site or site.event_reminder_24h_enabled is not False,
-            '1h': not site or site.event_reminder_1h_enabled is not False,
-        }
+            reminder_enabled = {
+                '24h': not site or site.event_reminder_24h_enabled is not False,
+                '1h': not site or site.event_reminder_1h_enabled is not False,
+            }
 
-        for rtype, hours in (('24h', 24), ('1h', 1)):
-            if not reminder_enabled.get(rtype, True):
-                continue
-            start, end = _window(now, hours)
-            for lc in classes:
-                if not (start <= lc.scheduled_at <= end):
+            for rtype, hours in (('24h', 24), ('1h', 1)):
+                if not reminder_enabled.get(rtype, True):
                     continue
-                for user in users:
-                    if user.role == 'admin':
+                start, end = _window(now, hours)
+                for lc in classes:
+                    if not (start <= lc.scheduled_at <= end):
                         continue
-                    exists = LiveClassReminderLog.query.filter_by(
-                        live_class_id=lc.id, user_id=user.id, reminder_type=rtype,
-                    ).first()
-                    if exists:
-                        continue
-                    try:
-                        if send_event_reminder_email(
-                            app, mail, user, lc, rtype, site=site, calendar_url=calendar_url,
-                        ):
-                            db.session.add(LiveClassReminderLog(
-                                live_class_id=lc.id, user_id=user.id, reminder_type=rtype,
-                            ))
-                            db.session.commit()
-                    except Exception as e:
-                        print(f'[reminder] {user.email} {lc.id} {rtype}: {e}')
-                        db.session.rollback()
+                    for user in users:
+                        if user.role == 'admin':
+                            continue
+                        exists = LiveClassReminderLog.query.filter_by(
+                            live_class_id=lc.id, user_id=user.id, reminder_type=rtype,
+                        ).first()
+                        if exists:
+                            continue
+                        try:
+                            if send_event_reminder_email(
+                                app, mail, user, lc, rtype, site=site, calendar_url=calendar_url,
+                            ):
+                                db.session.add(LiveClassReminderLog(
+                                    live_class_id=lc.id, user_id=user.id, reminder_type=rtype,
+                                ))
+                                db.session.commit()
+                        except Exception as e:
+                            print(f'[reminder] {user.email} {lc.id} {rtype}: {e}')
+                            db.session.rollback()
+        finally:
+            db.session.remove()
 
 
 def main():

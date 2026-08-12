@@ -46,6 +46,7 @@ services:
       MAIL_USE_SSL: ${MAIL_USE_SSL:-false}
       ACADEMY_NAME: ${ACADEMY_NAME:-Marca Atractora}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      SKIP_DB_INIT: "1"
       SECRET_KEY_FILE: /run/secrets/secret_key
       MAIL_USERNAME_FILE: /run/secrets/mail_username
       MAIL_PASSWORD_FILE: /run/secrets/mail_password
@@ -70,6 +71,7 @@ services:
       MAIL_USE_SSL: ${MAIL_USE_SSL:-false}
       ACADEMY_NAME: ${ACADEMY_NAME:-Marca Atractora}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      SKIP_DB_INIT: "1"
       SECRET_KEY_FILE: /run/secrets/secret_key
       MAIL_USERNAME_FILE: /run/secrets/mail_username
       MAIL_PASSWORD_FILE: /run/secrets/mail_password
@@ -89,6 +91,7 @@ services:
     command: ["python", "backup_worker.py"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/miacademia}
+      SKIP_DB_INIT: "1"
       SECRET_KEY_FILE: /run/secrets/secret_key
     volumes:
       - ./secrets:/run/secrets:ro

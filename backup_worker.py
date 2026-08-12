@@ -33,63 +33,55 @@ def main():
     while True:
         try:
             with psycopg2.connect(db_url) as conn:
+                conn.autocommit = True
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute("SELECT * FROM site_settings ORDER BY id ASC LIMIT 1")
                     s = cur.fetchone()
-                    if not s:
-                        time.sleep(60)
-                        continue
 
-                    if not s.get("backup_enabled"):
-                        time.sleep(60)
-                        continue
+            if not s or not s.get("backup_enabled"):
+                time.sleep(60)
+                continue
 
-                    last_run = s.get("backup_last_run_at")
-                    interval_h = max(int(s.get("backup_interval_hours") or 24), 1)
-                    due = not last_run or (utcnow() - last_run.replace(tzinfo=timezone.utc)).total_seconds() >= interval_h * 3600
-                    if not due:
-                        time.sleep(60)
-                        continue
+            last_run = s.get("backup_last_run_at")
+            interval_h = max(int(s.get("backup_interval_hours") or 24), 1)
+            due = not last_run or (utcnow() - last_run.replace(tzinfo=timezone.utc)).total_seconds() >= interval_h * 3600
+            if not due:
+                time.sleep(60)
+                continue
 
-                    payload = {
-                        "backup_local_path": s.get("backup_local_path") or "/app/backups",
-                        "backup_retention_days": s.get("backup_retention_days") or 14,
-                        "backup_s3_enabled": s.get("backup_s3_enabled"),
-                        "backup_s3_bucket": s.get("backup_s3_bucket") or "",
-                        "backup_s3_region": s.get("backup_s3_region") or "eu-west-1",
-                        "backup_s3_prefix": s.get("backup_s3_prefix") or "miacademia",
-                        "backup_s3_endpoint_url": s.get("backup_s3_endpoint_url") or "",
-                        "backup_s3_access_key": decrypt_value(s.get("backup_s3_access_key_enc") or "", secret_key),
-                        "backup_s3_secret_key": decrypt_value(s.get("backup_s3_secret_key_enc") or "", secret_key),
-                    }
-                    app_name = s.get("academy_name") or "miacademia"
-                    try:
-                        result = run_backup(payload, app_name, db_url)
-                        cur.execute(
-                            """
-                            UPDATE site_settings
-                            SET backup_last_run_at = NOW(),
-                                backup_last_status = %s,
-                                backup_last_error = %s
-                            WHERE id = %s
-                            """,
-                            ("ok", "", s["id"]),
-                        )
-                        conn.commit()
-                        print(f"[backup-worker] OK {result['file']}")
-                    except Exception as e:
-                        cur.execute(
-                            """
-                            UPDATE site_settings
-                            SET backup_last_run_at = NOW(),
-                                backup_last_status = %s,
-                                backup_last_error = %s
-                            WHERE id = %s
-                            """,
-                            ("error", str(e)[:2000], s["id"]),
-                        )
-                        conn.commit()
-                        print(f"[backup-worker] ERROR {e}")
+            payload = {
+                "backup_local_path": s.get("backup_local_path") or "/app/backups",
+                "backup_retention_days": s.get("backup_retention_days") or 14,
+                "backup_s3_enabled": s.get("backup_s3_enabled"),
+                "backup_s3_bucket": s.get("backup_s3_bucket") or "",
+                "backup_s3_region": s.get("backup_s3_region") or "eu-west-1",
+                "backup_s3_prefix": s.get("backup_s3_prefix") or "miacademia",
+                "backup_s3_endpoint_url": s.get("backup_s3_endpoint_url") or "",
+                "backup_s3_access_key": decrypt_value(s.get("backup_s3_access_key_enc") or "", secret_key),
+                "backup_s3_secret_key": decrypt_value(s.get("backup_s3_secret_key_enc") or "", secret_key),
+            }
+            app_name = s.get("academy_name") or "miacademia"
+            try:
+                result = run_backup(payload, app_name, db_url)
+                status, err = "ok", ""
+                print(f"[backup-worker] OK {result['file']}")
+            except Exception as e:
+                status, err = "error", str(e)[:2000]
+                print(f"[backup-worker] ERROR {e}")
+
+            with psycopg2.connect(db_url) as conn:
+                conn.autocommit = True
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE site_settings
+                        SET backup_last_run_at = NOW(),
+                            backup_last_status = %s,
+                            backup_last_error = %s
+                        WHERE id = %s
+                        """,
+                        (status, err, s["id"]),
+                    )
         except Exception as e:
             print(f"[backup-worker] Loop error: {e}")
 

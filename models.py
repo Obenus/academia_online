@@ -326,6 +326,7 @@ class SiteSettings(db.Model):
     commercial_reply_subject     = db.Column(db.String(300), default='')
     commercial_reply_body        = db.Column(db.Text, default='')
     commercial_reply_whatsapp_url = db.Column(db.String(500), default='')
+    library_catalog_order        = db.Column(db.Text, default='')  # claves de tarjetas, una por línea
     welcome_video_url            = db.Column(db.String(500), default='')
     how_it_works_video_url       = db.Column(db.String(500), default='')
     start_page_intro             = db.Column(db.Text, default='')

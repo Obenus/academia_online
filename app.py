@@ -109,7 +109,7 @@ app.jinja_env.globals['get_level']  = lambda pts: get_level(pts)  # set after ge
 def notify(user_id, type_, message, link=''):
     db.session.add(Notification(user_id=user_id, type=type_, message=message, link=link))
 
-_SKIP_PATHS = ('/avatar/', '/curso/', '/comunidad/banner', '/leccion-imagen/', '/static/')
+_SKIP_PATHS = ('/avatar/', '/curso/', '/comunidad/banner', '/leccion-imagen/', '/static/', '/biblioteca/api/')
 
 # Rutas accesibles con suscripción suspendida (gestionar pago)
 _SUBSCRIPTION_EXEMPT_ENDPOINTS = frozenset({
@@ -4659,263 +4659,268 @@ def commercial_landing(slug):
     return _render_commercial_landing()
 
 
-with app.app_context():
-    try:
-        db.create_all()
-    except Exception as e:
-        print(f'[DB] ERROR en create_all: {e}')
-    try:
-        with db.engine.connect() as conn:
-            # lesson_file binary migration
-            conn.execute(text("ALTER TABLE lesson_file ADD COLUMN IF NOT EXISTS data BYTEA"))
-            conn.execute(text("ALTER TABLE lesson_file ADD COLUMN IF NOT EXISTS mimetype VARCHAR(100) DEFAULT 'application/octet-stream'"))
-            conn.execute(text("ALTER TABLE lesson_file ADD COLUMN IF NOT EXISTS size INTEGER DEFAULT 0"))
-            conn.execute(text("ALTER TABLE lesson_file DROP COLUMN IF EXISTS url"))
-            # user: last_seen + avatar
-            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP"))
-            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS avatar_data BYTEA"))
-            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS avatar_mime VARCHAR(50) DEFAULT 'image/jpeg'"))
-            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'"))
-            # site_settings: binary banner
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS community_image_data BYTEA"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS community_image_mime VARCHAR(50) DEFAULT 'image/jpeg'"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_enabled BOOLEAN DEFAULT FALSE"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_interval_hours INTEGER DEFAULT 24"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_retention_days INTEGER DEFAULT 14"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_local_path VARCHAR(300) DEFAULT '/app/backups'"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_enabled BOOLEAN DEFAULT FALSE"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_bucket VARCHAR(200) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_region VARCHAR(100) DEFAULT 'eu-west-1'"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_prefix VARCHAR(200) DEFAULT 'miacademia'"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_endpoint_url VARCHAR(300) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_access_key_enc TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_secret_key_enc TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_last_run_at TIMESTAMP"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_last_status VARCHAR(40) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_last_error TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS payments_enabled BOOLEAN DEFAULT FALSE"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS stripe_public_key VARCHAR(200) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS stripe_secret_key_enc TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS stripe_webhook_secret_enc TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS pay_auto_activate BOOLEAN DEFAULT TRUE"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS welcome_email_subject VARCHAR(300) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS welcome_email_body TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS admin_reg_email_subject VARCHAR(300) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS admin_reg_email_body TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_email_subject VARCHAR(300) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_email_body TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_24h_enabled BOOLEAN DEFAULT TRUE"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_1h_enabled BOOLEAN DEFAULT TRUE"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS player_bar_bg VARCHAR(20) DEFAULT '#141414'"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS player_bar_accent VARCHAR(20) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS player_bar_text VARCHAR(20) DEFAULT '#bfbfbf'"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS player_bar_btn VARCHAR(20) DEFAULT '#2a2a2a'"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_hook TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_intro TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_what_is TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_how_helps TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_explore_questions TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_includes TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_for_you TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_closing TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_cta_text VARCHAR(120) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_price_note VARCHAR(200) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_title VARCHAR(200) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_subtitle VARCHAR(300) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_url VARCHAR(500) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_community_md TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_privacy_md TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_cookies_md TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_notice_md TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_enabled BOOLEAN DEFAULT FALSE"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_slug VARCHAR(80) DEFAULT 'oferta'"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_title VARCHAR(200) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_text TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_whatsapp_url VARCHAR(500) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_image_data BYTEA"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_image_mime VARCHAR(50) DEFAULT 'image/jpeg'"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_lead_notify_email VARCHAR(200) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_subject VARCHAR(300) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_body TEXT DEFAULT ''"))
-            conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_whatsapp_url VARCHAR(500) DEFAULT ''"))
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS commercial_lead (
-                    id SERIAL PRIMARY KEY,
-                    name VARCHAR(200) NOT NULL,
-                    email VARCHAR(120) NOT NULL,
-                    privacy_accepted BOOLEAN DEFAULT TRUE,
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            """))
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS password_reset_token (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-                    token VARCHAR(64) UNIQUE NOT NULL,
-                    created_at TIMESTAMP DEFAULT NOW(),
-                    expires_at TIMESTAMP NOT NULL,
-                    used_at TIMESTAMP
-                )
-            """))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_password_reset_token_token ON password_reset_token(token)"))
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS subscription_plan (
-                    id SERIAL PRIMARY KEY,
-                    name VARCHAR(120) NOT NULL,
-                    description TEXT DEFAULT '',
-                    price_monthly DOUBLE PRECISION DEFAULT 0,
-                    stripe_price_id VARCHAR(120) DEFAULT '',
-                    is_active BOOLEAN DEFAULT TRUE,
-                    sort_order INTEGER DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            """))
-            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS billing_type VARCHAR(20) DEFAULT 'standard'"))
-            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS subscription_plan_id INTEGER REFERENCES subscription_plan(id)"))
-            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(120) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(120) DEFAULT ''"))
-            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(30) DEFAULT 'none'"))
-            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS subscription_period_end TIMESTAMP"))
-            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS subscription_last_paid_at TIMESTAMP"))
-            # point_event table (created by db.create_all, but add index hint)
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_point_event_user ON point_event(user_id)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_point_event_date ON point_event(created_at)"))
-            conn.execute(text("ALTER TABLE live_class ADD COLUMN IF NOT EXISTS recurrence VARCHAR(10) DEFAULT 'none'"))
-            conn.execute(text("ALTER TABLE live_class ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES live_class(id)"))
-            # course cover image (binary)
-            conn.execute(text("ALTER TABLE course ADD COLUMN IF NOT EXISTS cover_data BYTEA"))
-            conn.execute(text("ALTER TABLE course ADD COLUMN IF NOT EXISTS cover_mime VARCHAR(50) DEFAULT 'image/jpeg'"))
-            conn.execute(text("ALTER TABLE course ADD COLUMN IF NOT EXISTS \"order\" INTEGER DEFAULT 0"))
-            # lesson inline images for rich-text descriptions
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS lesson_image (
-                    id SERIAL PRIMARY KEY,
-                    lesson_id INTEGER NOT NULL REFERENCES lesson(id) ON DELETE CASCADE,
-                    mimetype VARCHAR(100) DEFAULT 'image/jpeg',
-                    data BYTEA NOT NULL,
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            """))
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS notification (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL REFERENCES \"user\"(id),
-                    type VARCHAR(30),
-                    message VARCHAR(300),
-                    link VARCHAR(200) DEFAULT '',
-                    is_read BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            """))
-            run_migrations(conn)
-            conn.commit()
-    except Exception as e:
-        print(f'[DB] ERROR en migraciones: {e}')
-    try:
-        ensure_calendar_categories()
-        ensure_community_categories()
-    except Exception as e:
-        print(f'[seed] categories: {e}')
-    sk = app.config.get('SECRET_KEY', '')
-    if not sk or sk == 'cambiar-en-produccion-secret-key-aqui':
-        print('[SECURITY] ⚠️ SECRET_KEY por defecto — configura secrets/secret_key antes de producción.')
-    # ── Diagnóstico de base de datos ──────────────────────────────────────────
-    _db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
-    if 'postgresql' in _db_uri:
-        print('=' * 60)
-        print('[DB] ✅ POSTGRESQL — datos PERSISTENTES')
-        print('=' * 60)
-    else:
-        print('=' * 60)
-        print('[DB] ⚠️  SQLITE — datos se pierden en cada despliegue.')
-        print('[DB]    Asegúrate de tener DATABASE_URL en Railway → Variables.')
-        print('=' * 60)
-
-    try:
-        seed_db()
-    except Exception as e:
-        print(f'[seed] ERROR en seed_db: {e}')
-        db.session.rollback()
-
-    try:
-        seed_descriptions()
-    except Exception as e:
-        print(f'[seed_desc] ERROR en seed_descriptions: {e}')
-        db.session.rollback()
-
-    # DB column migration: add group_label to lesson if missing
-    try:
-        with db.engine.connect() as _conn:
-            _conn.execute(text(
-                "ALTER TABLE lesson ADD COLUMN IF NOT EXISTS group_label VARCHAR(200)"
-            ))
-            _conn.commit()
-    except Exception as _e:
-        print(f'[migration] group_label: {_e}')
-
-    # DB migration: comment_likes table
-    try:
-        with db.engine.connect() as _conn:
-            _conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS comment_likes (
-                    user_id    INTEGER NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-                    comment_id INTEGER NOT NULL REFERENCES comment(id) ON DELETE CASCADE,
-                    PRIMARY KEY (user_id, comment_id)
-                )
-            """))
-            _conn.commit()
-    except Exception as _e:
-        print(f'[migration] comment_likes: {_e}')
-
-    fix_duplicate_fase5()
-    seed_fase5()
-    fix_fase5_carpeta6()
-    seed_bono_habitos()
-    seed_bono_organizacion()
-    seed_liberacion_emocional()
-    seed_programas_marca()
-    seed_clases_2026()
-    seed_ia()
-    seed_clases_2025()
-    seed_coach_profesional()
-
-    # Backfill points — solo si faltan registros (compara conteos, evita N+1 en cada arranque)
-    try:
-        lp_count = LessonProgress.query.count()
-        pt_lesson = PointEvent.query.filter_by(reason='lesson').count()
-        if lp_count > 0 and pt_lesson < lp_count:
-            # Usar INSERT ... WHERE NOT EXISTS para ser eficiente
-            with db.engine.begin() as _c:
-                _c.execute(text("""
-                    INSERT INTO point_event (user_id, points, reason, ref_id, created_at)
-                    SELECT lp.user_id, 3, 'lesson', lp.lesson_id, lp.completed_at
-                    FROM lesson_progress lp
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM point_event pe
-                        WHERE pe.user_id = lp.user_id AND pe.reason = 'lesson' AND pe.ref_id = lp.lesson_id
+_skip_db_init = os.environ.get('SKIP_DB_INIT', '').strip().lower() in ('1', 'true', 'yes')
+if _skip_db_init:
+    print('[DB] SKIP_DB_INIT activo — omitiendo migraciones/seed en este proceso.')
+else:
+    with app.app_context():
+        try:
+            db.create_all()
+        except Exception as e:
+            print(f'[DB] ERROR en create_all: {e}')
+        try:
+            with db.engine.connect() as conn:
+                # lesson_file binary migration
+                conn.execute(text("ALTER TABLE lesson_file ADD COLUMN IF NOT EXISTS data BYTEA"))
+                conn.execute(text("ALTER TABLE lesson_file ADD COLUMN IF NOT EXISTS mimetype VARCHAR(100) DEFAULT 'application/octet-stream'"))
+                conn.execute(text("ALTER TABLE lesson_file ADD COLUMN IF NOT EXISTS size INTEGER DEFAULT 0"))
+                conn.execute(text("ALTER TABLE lesson_file DROP COLUMN IF EXISTS url"))
+                # user: last_seen + avatar
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP"))
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS avatar_data BYTEA"))
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS avatar_mime VARCHAR(50) DEFAULT 'image/jpeg'"))
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'"))
+                # site_settings: binary banner
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS community_image_data BYTEA"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS community_image_mime VARCHAR(50) DEFAULT 'image/jpeg'"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_enabled BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_interval_hours INTEGER DEFAULT 24"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_retention_days INTEGER DEFAULT 14"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_local_path VARCHAR(300) DEFAULT '/app/backups'"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_enabled BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_bucket VARCHAR(200) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_region VARCHAR(100) DEFAULT 'eu-west-1'"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_prefix VARCHAR(200) DEFAULT 'miacademia'"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_endpoint_url VARCHAR(300) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_access_key_enc TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_s3_secret_key_enc TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_last_run_at TIMESTAMP"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_last_status VARCHAR(40) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS backup_last_error TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS payments_enabled BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS stripe_public_key VARCHAR(200) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS stripe_secret_key_enc TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS stripe_webhook_secret_enc TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS pay_auto_activate BOOLEAN DEFAULT TRUE"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS welcome_email_subject VARCHAR(300) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS welcome_email_body TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS admin_reg_email_subject VARCHAR(300) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS admin_reg_email_body TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_email_subject VARCHAR(300) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_email_body TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_24h_enabled BOOLEAN DEFAULT TRUE"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS event_reminder_1h_enabled BOOLEAN DEFAULT TRUE"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS player_bar_bg VARCHAR(20) DEFAULT '#141414'"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS player_bar_accent VARCHAR(20) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS player_bar_text VARCHAR(20) DEFAULT '#bfbfbf'"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS player_bar_btn VARCHAR(20) DEFAULT '#2a2a2a'"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_hook TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_intro TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_what_is TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_how_helps TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_explore_questions TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_includes TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_for_you TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_closing TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_cta_text VARCHAR(120) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_price_note VARCHAR(200) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_title VARCHAR(200) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_subtitle VARCHAR(300) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_url VARCHAR(500) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_community_md TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_privacy_md TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_cookies_md TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_notice_md TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_enabled BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_slug VARCHAR(80) DEFAULT 'oferta'"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_title VARCHAR(200) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_text TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_whatsapp_url VARCHAR(500) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_image_data BYTEA"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_image_mime VARCHAR(50) DEFAULT 'image/jpeg'"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_lead_notify_email VARCHAR(200) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_subject VARCHAR(300) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_body TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_whatsapp_url VARCHAR(500) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS library_catalog_order TEXT DEFAULT ''"))
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS commercial_lead (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(200) NOT NULL,
+                        email VARCHAR(120) NOT NULL,
+                        privacy_accepted BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT NOW()
                     )
                 """))
-                _c.execute(text("""
-                    INSERT INTO point_event (user_id, points, reason, ref_id, created_at)
-                    SELECT c.user_id, 2, 'comment', c.id, c.created_at
-                    FROM comment c
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM point_event pe
-                        WHERE pe.user_id = c.user_id AND pe.reason = 'comment' AND pe.ref_id = c.id
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS password_reset_token (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+                        token VARCHAR(64) UNIQUE NOT NULL,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        expires_at TIMESTAMP NOT NULL,
+                        used_at TIMESTAMP
                     )
                 """))
-                _c.execute(text("""
-                    INSERT INTO point_event (user_id, points, reason, ref_id, created_at)
-                    SELECT p.user_id, 4, 'post', p.id, p.created_at
-                    FROM post p
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM point_event pe
-                        WHERE pe.user_id = p.user_id AND pe.reason = 'post' AND pe.ref_id = p.id
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_password_reset_token_token ON password_reset_token(token)"))
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS subscription_plan (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(120) NOT NULL,
+                        description TEXT DEFAULT '',
+                        price_monthly DOUBLE PRECISION DEFAULT 0,
+                        stripe_price_id VARCHAR(120) DEFAULT '',
+                        is_active BOOLEAN DEFAULT TRUE,
+                        sort_order INTEGER DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT NOW()
                     )
                 """))
-            print('[backfill] Puntos completados correctamente.')
-    except Exception as e:
-        print(f'[seed] ERROR en backfill points: {e}')
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS billing_type VARCHAR(20) DEFAULT 'standard'"))
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS subscription_plan_id INTEGER REFERENCES subscription_plan(id)"))
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(120) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(120) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(30) DEFAULT 'none'"))
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS subscription_period_end TIMESTAMP"))
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS subscription_last_paid_at TIMESTAMP"))
+                # point_event table (created by db.create_all, but add index hint)
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_point_event_user ON point_event(user_id)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_point_event_date ON point_event(created_at)"))
+                conn.execute(text("ALTER TABLE live_class ADD COLUMN IF NOT EXISTS recurrence VARCHAR(10) DEFAULT 'none'"))
+                conn.execute(text("ALTER TABLE live_class ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES live_class(id)"))
+                # course cover image (binary)
+                conn.execute(text("ALTER TABLE course ADD COLUMN IF NOT EXISTS cover_data BYTEA"))
+                conn.execute(text("ALTER TABLE course ADD COLUMN IF NOT EXISTS cover_mime VARCHAR(50) DEFAULT 'image/jpeg'"))
+                conn.execute(text("ALTER TABLE course ADD COLUMN IF NOT EXISTS \"order\" INTEGER DEFAULT 0"))
+                # lesson inline images for rich-text descriptions
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS lesson_image (
+                        id SERIAL PRIMARY KEY,
+                        lesson_id INTEGER NOT NULL REFERENCES lesson(id) ON DELETE CASCADE,
+                        mimetype VARCHAR(100) DEFAULT 'image/jpeg',
+                        data BYTEA NOT NULL,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """))
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS notification (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES \"user\"(id),
+                        type VARCHAR(30),
+                        message VARCHAR(300),
+                        link VARCHAR(200) DEFAULT '',
+                        is_read BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """))
+                run_migrations(conn)
+                conn.commit()
+        except Exception as e:
+            print(f'[DB] ERROR en migraciones: {e}')
+        try:
+            ensure_calendar_categories()
+            ensure_community_categories()
+        except Exception as e:
+            print(f'[seed] categories: {e}')
+        sk = app.config.get('SECRET_KEY', '')
+        if not sk or sk == 'cambiar-en-produccion-secret-key-aqui':
+            print('[SECURITY] ⚠️ SECRET_KEY por defecto — configura secrets/secret_key antes de producción.')
+        # ── Diagnóstico de base de datos ──────────────────────────────────────────
+        _db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        if 'postgresql' in _db_uri:
+            print('=' * 60)
+            print('[DB] ✅ POSTGRESQL — datos PERSISTENTES')
+            print('=' * 60)
+        else:
+            print('=' * 60)
+            print('[DB] ⚠️  SQLITE — datos se pierden en cada despliegue.')
+            print('[DB]    Asegúrate de tener DATABASE_URL en Railway → Variables.')
+            print('=' * 60)
+
+        try:
+            seed_db()
+        except Exception as e:
+            print(f'[seed] ERROR en seed_db: {e}')
+            db.session.rollback()
+
+        try:
+            seed_descriptions()
+        except Exception as e:
+            print(f'[seed_desc] ERROR en seed_descriptions: {e}')
+            db.session.rollback()
+
+        # DB column migration: add group_label to lesson if missing
+        try:
+            with db.engine.connect() as _conn:
+                _conn.execute(text(
+                    "ALTER TABLE lesson ADD COLUMN IF NOT EXISTS group_label VARCHAR(200)"
+                ))
+                _conn.commit()
+        except Exception as _e:
+            print(f'[migration] group_label: {_e}')
+
+        # DB migration: comment_likes table
+        try:
+            with db.engine.connect() as _conn:
+                _conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS comment_likes (
+                        user_id    INTEGER NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+                        comment_id INTEGER NOT NULL REFERENCES comment(id) ON DELETE CASCADE,
+                        PRIMARY KEY (user_id, comment_id)
+                    )
+                """))
+                _conn.commit()
+        except Exception as _e:
+            print(f'[migration] comment_likes: {_e}')
+
+        fix_duplicate_fase5()
+        seed_fase5()
+        fix_fase5_carpeta6()
+        seed_bono_habitos()
+        seed_bono_organizacion()
+        seed_liberacion_emocional()
+        seed_programas_marca()
+        seed_clases_2026()
+        seed_ia()
+        seed_clases_2025()
+        seed_coach_profesional()
+
+        # Backfill points — solo si faltan registros (compara conteos, evita N+1 en cada arranque)
+        try:
+            lp_count = LessonProgress.query.count()
+            pt_lesson = PointEvent.query.filter_by(reason='lesson').count()
+            if lp_count > 0 and pt_lesson < lp_count:
+                # Usar INSERT ... WHERE NOT EXISTS para ser eficiente
+                with db.engine.begin() as _c:
+                    _c.execute(text("""
+                        INSERT INTO point_event (user_id, points, reason, ref_id, created_at)
+                        SELECT lp.user_id, 3, 'lesson', lp.lesson_id, lp.completed_at
+                        FROM lesson_progress lp
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM point_event pe
+                            WHERE pe.user_id = lp.user_id AND pe.reason = 'lesson' AND pe.ref_id = lp.lesson_id
+                        )
+                    """))
+                    _c.execute(text("""
+                        INSERT INTO point_event (user_id, points, reason, ref_id, created_at)
+                        SELECT c.user_id, 2, 'comment', c.id, c.created_at
+                        FROM comment c
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM point_event pe
+                            WHERE pe.user_id = c.user_id AND pe.reason = 'comment' AND pe.ref_id = c.id
+                        )
+                    """))
+                    _c.execute(text("""
+                        INSERT INTO point_event (user_id, points, reason, ref_id, created_at)
+                        SELECT p.user_id, 4, 'post', p.id, p.created_at
+                        FROM post p
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM point_event pe
+                            WHERE pe.user_id = p.user_id AND pe.reason = 'post' AND pe.ref_id = p.id
+                        )
+                    """))
+                print('[backfill] Puntos completados correctamente.')
+        except Exception as e:
+            print(f'[seed] ERROR en backfill points: {e}')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5002))

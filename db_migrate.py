@@ -169,6 +169,7 @@ def run_migrations(conn):
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_subject VARCHAR(300) DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_body TEXT DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_whatsapp_url VARCHAR(500) DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS library_catalog_order TEXT DEFAULT ''",
         """CREATE TABLE IF NOT EXISTS commercial_lead (
             id SERIAL PRIMARY KEY,
             name VARCHAR(200) NOT NULL,

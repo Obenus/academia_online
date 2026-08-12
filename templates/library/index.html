@@ -13,44 +13,97 @@
   {% endif %}
 </div>
 
+{% if current_user.is_admin and cards %}
+<div class="flex items-center gap-3 mb-4 text-xs font-medium" style="color:#7c3aed">
+  <span>⠿ Arrastra para reordenar</span>
+  <span id="library-catalog-status"></span>
+</div>
+{% endif %}
+
 {% if cards %}
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+<div id="library-catalog-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
   {% for card in cards %}
-  <a href="{{ url_for('library.course_view', slug=card.slug) }}"
-     class="block rounded-2xl overflow-hidden shadow-sm border transition-all hover:shadow-lg hover:-translate-y-0.5"
-     style="background:var(--surface);border-color:var(--border);text-decoration:none">
+  <div class="rounded-2xl overflow-hidden shadow-sm border transition-all hover:shadow-lg hover:-translate-y-0.5 relative group"
+       style="background:var(--surface);border-color:var(--border)"
+       data-key="{{ card.key }}">
 
-    <div class="w-full aspect-[16/9] overflow-hidden flex items-center justify-center relative"
-         style="background:#1a1a1a">
-      {% if card.course and card.course.cover_data %}
-      <img src="{{ url_for('serve_course_cover', course_id=card.course.id) }}" alt="{{ card.title }}"
-           class="w-full h-full object-cover"/>
-      {% elif card.kind == 'encuentros' %}
-      <div class="w-full h-full flex items-center justify-center"
-           style="background:linear-gradient(135deg,#7c3aed,#6d28d9)">
-        <span class="text-6xl">🎥</span>
-      </div>
-      {% else %}
-      <span class="text-7xl opacity-25">📚</span>
-      {% endif %}
-      <div class="absolute top-3 left-3">
-        <span class="text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wide shadow text-white"
-              style="background:{% if card.kind=='encuentros' %}#dc2626{% else %}#7c3aed{% endif %}">
-          {% if card.kind=='encuentros' %}Encuentro{% else %}Formación{% endif %}
-        </span>
-      </div>
-    </div>
+    {% if current_user.is_admin %}
+    <div class="drag-handle absolute top-3 left-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity
+                w-7 h-7 bg-black/50 rounded-lg flex items-center justify-center text-white cursor-grab select-none"
+         title="Arrastrar">⠿</div>
+    {% endif %}
 
-    <div class="p-5">
-      <h2 class="font-bold text-base leading-snug mb-1" style="color:var(--text1)">{{ card.title }}</h2>
-      {% if card.subtitle %}
-      <p class="text-sm leading-relaxed line-clamp-2 mb-3" style="color:var(--text3)">{{ card.subtitle }}</p>
-      {% endif %}
-      <p class="text-xs font-semibold" style="color:var(--text4)">{{ card.count }} vídeo{{ 's' if card.count != 1 else '' }}</p>
-    </div>
-  </a>
+    <a href="{{ url_for('library.course_view', slug=card.slug) }}"
+       class="block" style="text-decoration:none">
+
+      <div class="w-full aspect-[16/9] overflow-hidden flex items-center justify-center relative"
+           style="background:#1a1a1a">
+        {% if card.course and card.course.cover_data %}
+        <img src="{{ url_for('serve_course_cover', course_id=card.course.id) }}" alt="{{ card.title }}"
+             class="w-full h-full object-cover" draggable="false"/>
+        {% elif card.thumb_url %}
+        <img src="{{ card.thumb_url }}" alt="{{ card.title }}"
+             class="w-full h-full object-cover"
+             loading="lazy" referrerpolicy="no-referrer" draggable="false"
+             onerror="this.style.display='none'"/>
+        {% elif card.kind == 'encuentros' %}
+        <div class="w-full h-full flex items-center justify-center"
+             style="background:linear-gradient(135deg,#7c3aed,#6d28d9)">
+          <span class="text-6xl">🎥</span>
+        </div>
+        {% else %}
+        <span class="text-7xl opacity-25">📚</span>
+        {% endif %}
+        <div class="absolute top-3 {% if current_user.is_admin %}left-12{% else %}left-3{% endif %}">
+          <span class="text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wide shadow text-white"
+                style="background:{% if card.kind=='encuentros' %}#dc2626{% else %}#7c3aed{% endif %}">
+            {% if card.kind=='encuentros' %}Encuentro{% else %}Formación{% endif %}
+          </span>
+        </div>
+      </div>
+
+      <div class="p-5">
+        <h2 class="font-bold text-base leading-snug mb-1" style="color:var(--text1)">{{ card.title }}</h2>
+        {% if card.subtitle %}
+        <p class="text-sm leading-relaxed line-clamp-2 mb-3" style="color:var(--text3)">{{ card.subtitle }}</p>
+        {% endif %}
+        <p class="text-xs font-semibold" style="color:var(--text4)">{{ card.count }} vídeo{{ 's' if card.count != 1 else '' }}</p>
+      </div>
+    </a>
+  </div>
   {% endfor %}
 </div>
+
+{% if current_user.is_admin %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+(function () {
+  const grid = document.getElementById('library-catalog-grid');
+  const status = document.getElementById('library-catalog-status');
+  if (!grid) return;
+  Sortable.create(grid, {
+    handle: '.drag-handle',
+    animation: 150,
+    async onEnd() {
+      const keys = [...grid.querySelectorAll('[data-key]')].map(el => el.dataset.key);
+      status.textContent = 'Guardando…';
+      try {
+        const res = await fetch('{{ url_for("library.catalog_reorder") }}', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({order: keys})
+        });
+        status.textContent = res.ok ? '✅ Guardado' : '❌ Error';
+      } catch (e) {
+        status.textContent = '❌ Error';
+      }
+      setTimeout(() => { status.textContent = ''; }, 2000);
+    }
+  });
+})();
+</script>
+{% endif %}
+
 {% else %}
 <div class="text-center py-16 rounded-xl" style="background:var(--surface);border:1px solid var(--border)">
   <p class="text-4xl mb-2">📚</p>

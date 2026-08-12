@@ -12,30 +12,45 @@
     <img src="{{ url_for('serve_course_cover', course_id=course.id) }}" alt="" class="w-full h-full object-cover"/>
   </div>
   {% endif %}
-  <div>
+  <div class="flex-1">
     <h1 class="text-xl font-bold" style="color:var(--text1)">{{ title }}</h1>
     {% if subtitle %}<p class="text-sm mt-1" style="color:var(--text3)">{{ subtitle }}</p>{% endif %}
     <p class="text-xs mt-2 font-medium" style="color:var(--text4)">{{ items|length }} vídeo{{ 's' if items|length != 1 else '' }}</p>
+    {% if current_user.is_admin %}
+    <div class="flex items-center gap-3 mt-3 text-xs font-medium" style="color:#7c3aed">
+      <span>⠿ Arrastra para reordenar</span>
+      <span id="library-course-status"></span>
+    </div>
+    {% endif %}
   </div>
 </div>
 
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+<div id="library-course-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
   {% for item in items %}
   {% if item.video_url %}
   <div role="button" tabindex="0"
-       class="lib-video-card cursor-pointer rounded-2xl overflow-hidden border shadow-sm transition hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-violet-500"
+       class="lib-video-card cursor-pointer rounded-2xl overflow-hidden border shadow-sm transition hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-violet-500 relative group"
        style="background:var(--surface);border-color:var(--border)"
        data-library-play
-       data-item-id="{{ item.id }}">
+       data-item-id="{{ item.id }}"
+       data-id="{{ item.id }}">
+
+    {% if current_user.is_admin %}
+    <div class="drag-handle absolute top-3 left-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity
+                w-7 h-7 bg-black/50 rounded-lg flex items-center justify-center text-white cursor-grab select-none"
+         title="Arrastrar">⠿</div>
+    {% endif %}
 
     <div class="aspect-video relative overflow-hidden pointer-events-none" style="background:#111">
-      <img src="{{ url_for('library.thumbnail', item_id=item.id) }}" alt=""
-           class="w-full h-full object-cover" loading="lazy" draggable="false"/>
+      {% set thumb = video_thumb(item.video_url) %}
+      <img src="{{ thumb or '' }}" alt=""
+           class="w-full h-full object-cover" loading="lazy" draggable="false" referrerpolicy="no-referrer"
+           onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 9%22%3E%3Crect fill=%22%23111%22 width=%2216%22 height=%229%22/%3E%3Ctext x=%228%22 y=%225%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%221.5%22%3E▶%3C/text%3E%3C/svg%3E'"/>
       <div class="absolute inset-0 flex items-center justify-center bg-black/25">
         <span class="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center text-xl shadow-lg">▶</span>
       </div>
       {% if item.item_type == 'encuentro' %}
-      <span class="absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded text-white bg-red-600">Encuentro</span>
+      <span class="absolute top-2 {% if current_user.is_admin %}left-12{% else %}left-2{% endif %} text-[10px] font-bold px-2 py-0.5 rounded text-white bg-red-600">Encuentro</span>
       {% endif %}
     </div>
 
@@ -50,6 +65,36 @@
   {% endif %}
   {% endfor %}
 </div>
+
+{% if current_user.is_admin %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+(function () {
+  const grid = document.getElementById('library-course-grid');
+  const status = document.getElementById('library-course-status');
+  if (!grid) return;
+  Sortable.create(grid, {
+    handle: '.drag-handle',
+    animation: 150,
+    async onEnd() {
+      const ids = [...grid.querySelectorAll('[data-id]')].map(el => parseInt(el.dataset.id, 10));
+      status.textContent = 'Guardando…';
+      try {
+        const res = await fetch('{{ url_for("library.admin_reorder") }}', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({order: ids})
+        });
+        status.textContent = res.ok ? '✅ Guardado' : '❌ Error';
+      } catch (e) {
+        status.textContent = '❌ Error';
+      }
+      setTimeout(() => { status.textContent = ''; }, 2000);
+    }
+  });
+})();
+</script>
+{% endif %}
 
 {% include 'library/_video_modal.html' %}
 {% endblock %}

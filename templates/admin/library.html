@@ -3,17 +3,25 @@
 {% block content_class %}max-w-6xl mx-auto{% endblock %}
 {% block content %}
 {% include 'admin/_nav.html' %}
-<div class="flex items-center justify-between mb-6 page-head">
+<div class="flex items-center justify-between mb-6 page-head flex-wrap gap-3">
   <div class="admin-page-head mb-0">
     <h1>📚 Biblioteca del Círculo</h1>
-    <p>Grabaciones y contenido extra por mes</p>
+    <p>Los vídeos <strong>nuevos salen primeros</strong>. Arrastra con ⠿ para reordenar.</p>
   </div>
   <a href="{{ url_for('library.admin_new') }}" class="btn btn-primary btn-sm">➕ Nuevo</a>
+</div>
+
+{% if items %}
+<div class="flex items-center gap-3 mb-3 text-xs font-medium" style="color:#7c3aed">
+  <span>⠿ Arrastra para reordenar</span>
+  <span id="library-status"></span>
 </div>
 <div class="rounded-xl overflow-hidden shadow-sm table-scroll" style="background:var(--surface);border:1px solid var(--border)">
   <table class="w-full text-sm">
     <thead>
       <tr style="border-bottom:1px solid var(--border);background:var(--hover-bg)">
+        <th class="px-2 py-3 text-left text-xs font-semibold w-8" style="color:var(--text3)"></th>
+        <th class="px-3 py-3 text-left text-xs font-semibold w-20" style="color:var(--text3)">Miniatura</th>
         <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Título</th>
         <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Mes</th>
         <th class="px-4 py-3 text-left text-xs font-semibold" style="color:var(--text3)">Tipo</th>
@@ -21,25 +29,78 @@
         <th class="px-4 py-3 text-right text-xs font-semibold" style="color:var(--text3)">Acciones</th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="library-sortable">
       {% for item in items %}
-      <tr style="border-bottom:1px solid var(--border)">
-        <td class="px-4 py-3 font-medium" style="color:var(--text1)">{{ item.title }}</td>
+      <tr style="border-bottom:1px solid var(--border)" data-id="{{ item.id }}" class="group">
+        <td class="px-2 py-3 align-middle">
+          <span class="drag-handle cursor-grab select-none text-lg leading-none opacity-40 group-hover:opacity-100"
+                style="color:var(--text3)" title="Arrastrar">⠿</span>
+        </td>
+        <td class="px-3 py-2">
+          <div class="w-16 h-10 rounded-md overflow-hidden bg-zinc-800 flex items-center justify-center">
+            {% set thumb = video_thumb(item.video_url) %}
+            {% if thumb %}
+            <img src="{{ thumb }}" alt=""
+                 class="w-full h-full object-cover"
+                 loading="lazy" referrerpolicy="no-referrer" draggable="false"
+                 onerror="this.style.display='none';this.parentNode.innerHTML='▶'"/>
+            {% else %}
+            <span class="text-zinc-400 text-xs">—</span>
+            {% endif %}
+          </div>
+        </td>
+        <td class="px-4 py-3 font-medium" style="color:var(--text1)">
+          {{ item.title }}
+          {% if item.video_url %}
+          <p class="text-[10px] mt-0.5 truncate max-w-[220px]" style="color:var(--text4)">{{ item.video_url }}</p>
+          {% endif %}
+        </td>
         <td class="px-4 py-3 text-xs" style="color:var(--text3)">{{ month_names[item.month] }} {{ item.year }}</td>
         <td class="px-4 py-3 text-xs">{{ item.item_type }}</td>
         <td class="px-4 py-3 text-xs">{{ 'Publicado' if item.is_published else 'Borrador' }}</td>
-        <td class="px-4 py-3 text-right">
+        <td class="px-4 py-3 text-right whitespace-nowrap">
           <a href="{{ url_for('library.admin_edit', item_id=item.id) }}" class="btn btn-secondary btn-sm">Editar</a>
           <form method="POST" action="{{ url_for('library.admin_delete', item_id=item.id) }}" class="inline" onsubmit="return confirm('¿Eliminar?')">
             <button type="submit" class="btn btn-secondary btn-sm" style="color:#ef4444">Borrar</button>
           </form>
         </td>
       </tr>
-      {% else %}
-      <tr><td colspan="5" class="px-4 py-8 text-center text-sm" style="color:var(--text4)">Sin elementos.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+(function () {
+  const list = document.getElementById('library-sortable');
+  const status = document.getElementById('library-status');
+  if (!list) return;
+  Sortable.create(list, {
+    handle: '.drag-handle',
+    animation: 150,
+    async onEnd() {
+      const ids = [...list.querySelectorAll('[data-id]')].map(el => parseInt(el.dataset.id, 10));
+      status.textContent = 'Guardando…';
+      try {
+        const res = await fetch('{{ url_for("library.admin_reorder") }}', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({order: ids})
+        });
+        status.textContent = res.ok ? '✅ Guardado' : '❌ Error';
+      } catch (e) {
+        status.textContent = '❌ Error';
+      }
+      setTimeout(() => { status.textContent = ''; }, 2000);
+    }
+  });
+})();
+</script>
+{% else %}
+<div class="rounded-xl border p-8 text-center text-sm" style="background:var(--surface);border-color:var(--border);color:var(--text4)">
+  Sin elementos.
+</div>
+{% endif %}
 {% include 'admin/_nav_footer.html' %}
 {% endblock %}

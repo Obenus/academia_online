@@ -75,14 +75,17 @@ def run_cycle(conn):
             ))
 
         with app.app_context():
-            for uid, reason in suspended:
-                user = User.query.get(uid)
-                if user:
-                    notify_admins_payment_failed(
-                        db, _notify, user, reason,
-                        app=app, mail=mail,
-                    )
-            db.session.commit()
+            try:
+                for uid, reason in suspended:
+                    user = User.query.get(uid)
+                    if user:
+                        notify_admins_payment_failed(
+                            db, _notify, user, reason,
+                            app=app, mail=mail,
+                        )
+                db.session.commit()
+            finally:
+                db.session.remove()
     except Exception as e:
         print(f'[billing-worker] Aviso email admin: {e}')
 

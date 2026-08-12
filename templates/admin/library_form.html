@@ -33,8 +33,16 @@
       <option value="{{ c.id }}" {% if item and item.live_class_id==c.id %}selected{% endif %}>{{ c.title }} ({{ c.scheduled_at.strftime('%d/%m/%Y') }})</option>
       {% endfor %}
     </select></div>
+  {% if item %}
   <div><label class="block text-xs mb-1" style="color:var(--text3)">Orden</label>
-    <input type="number" name="sort_order" class="input" value="{{ item.sort_order if item else 0 }}"/></div>
+    <input type="number" name="sort_order" class="input" value="{{ item.sort_order }}"/>
+    <p class="text-[11px] mt-1" style="color:var(--text4)">Menor número = aparece antes. También puedes usar ↑ ↓ en el listado.</p>
+  </div>
+  {% else %}
+  <p class="text-xs rounded-lg p-3" style="background:var(--hover-bg);color:var(--text3)">
+    El vídeo nuevo se colocará <strong>el primero</strong> automáticamente. Después podrás cambiar el orden en el listado.
+  </p>
+  {% endif %}
   <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_published" {% if not item or item.is_published %}checked{% endif %}/> Publicado</label>
   <button type="submit" class="btn btn-primary w-full justify-center">Guardar</button>
 </form>

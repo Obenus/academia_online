@@ -78,19 +78,30 @@ def video_thumbnail_url(url):
     if not url:
         return ''
     url = url.strip()
-    m = re.search(r'youtu\.be/([a-zA-Z0-9_-]{11})', url)
-    if m:
-        return f'https://img.youtube.com/vi/{m.group(1)}/hqdefault.jpg'
-    m = re.search(r'[?&]v=([a-zA-Z0-9_-]{11})', url)
-    if m:
-        return f'https://img.youtube.com/vi/{m.group(1)}/hqdefault.jpg'
-    m = re.search(r'youtube\.com/embed/([a-zA-Z0-9_-]{11})', url)
-    if m:
-        return f'https://img.youtube.com/vi/{m.group(1)}/hqdefault.jpg'
+    yid = youtube_video_id(url)
+    if yid:
+        # hqdefault es la más fiable (maxresdefault no existe en todos los vídeos)
+        return f'https://img.youtube.com/vi/{yid}/hqdefault.jpg'
     m = re.search(r'vimeo\.com/(?:video/)?(\d+)', url)
+    if not m:
+        m = re.search(r'player\.vimeo\.com/video/(\d+)', url)
     if m:
-        return f'https://vumbnail.com/{m.group(1)}.jpg'
-    m = re.search(r'player\.vimeo\.com/video/(\d+)', url)
-    if m:
-        return f'https://vumbnail.com/{m.group(1)}.jpg'
+        vid = m.group(1)
+        # vumbnail + fallback oEmbed se resuelve en el proxy si hace falta
+        return f'https://vumbnail.com/{vid}.jpg'
     return ''
+
+
+def vimeo_oembed_thumbnail(url):
+    """Consulta oEmbed de Vimeo para obtener la miniatura real."""
+    import json
+    import urllib.request
+    from urllib.parse import quote as _q
+    try:
+        api = f'https://vimeo.com/api/oembed.json?url={_q(url, safe="")}'
+        req = urllib.request.Request(api, headers={'User-Agent': 'MiAcademia/1.0'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode('utf-8', errors='ignore'))
+        return (data.get('thumbnail_url') or '').strip()
+    except Exception:
+        return ''
