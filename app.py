@@ -1302,24 +1302,6 @@ def admin_settings():
                     flash(f'Email de prueba enviado a {to}.', 'success')
                 else:
                     flash('No se pudo enviar. Revisa usuario, contraseña y servidor SMTP.', 'error')
-    if request.method == 'POST' and request.form.get('action') == 'smtp_test':
-        apply_smtp_config(app, mail)
-        to = (request.form.get('test_email') or current_user.email or '').strip()
-        if not to:
-            flash('Indica un email de destino para la prueba.', 'error')
-        else:
-            academy = s.academy_name or app.config.get('ACADEMY_NAME', 'Academia')
-            try:
-                ok = send_html_email(
-                    app, mail, [to],
-                    f'Prueba SMTP — {academy}',
-                    f'<p>Si recibes este mensaje, el SMTP de <strong>{academy}</strong> funciona correctamente.</p>'
-                    f'<p>Servidor: {app.config.get("MAIL_SERVER")} · Puerto: {app.config.get("MAIL_PORT")}</p>',
-                )
-                if ok:
-                    flash(f'Email de prueba enviado a {to}.', 'success')
-                else:
-                    flash('No se pudo enviar. Revisa usuario, contraseña y servidor SMTP.', 'error')
             except Exception as e:
                 host = app.config.get('MAIL_SERVER')
                 port = app.config.get('MAIL_PORT')
