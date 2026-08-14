@@ -391,7 +391,7 @@ def admin_test_email():
         if ok:
             flash(f'Email de prueba enviado a {to}.', 'success')
         else:
-            flash('No se pudo enviar (revisa MAIL_*).', 'error')
+            flash('No se pudo enviar. Revisa SMTP en Ajustes.', 'error')
     except Exception as e:
         flash(f'Error: {e}', 'error')
     return redirect(url_for('admin_payments'))
@@ -419,8 +419,10 @@ def register_bulk_email_routes(app, mail, get_settings_fn):
             if not subject or not body:
                 flash('Asunto y mensaje obligatorios.', 'error')
                 return redirect(url_for('admin_email'))
-            if not app.config.get('MAIL_USERNAME'):
-                flash('Email no configurado.', 'error')
+            from billing import apply_smtp_config, _mail_configured
+            apply_smtp_config(app, mail)
+            if not _mail_configured(app, mail):
+                flash('Email no configurado. Ve a Ajustes → SMTP.', 'error')
                 return redirect(url_for('admin_email'))
             site = get_settings_fn()
             html = f"""<div style="font-family:sans-serif;max-width:600px;margin:0 auto">

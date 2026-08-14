@@ -327,6 +327,13 @@ class SiteSettings(db.Model):
     commercial_reply_body        = db.Column(db.Text, default='')
     commercial_reply_whatsapp_url = db.Column(db.String(500), default='')
     library_catalog_order        = db.Column(db.Text, default='')  # claves de tarjetas, una por línea
+    mail_server                  = db.Column(db.String(200), default='')
+    mail_port                    = db.Column(db.Integer, default=587)
+    mail_use_tls                 = db.Column(db.Boolean, default=True)
+    mail_use_ssl                 = db.Column(db.Boolean, default=False)
+    mail_username                = db.Column(db.String(200), default='')
+    mail_password_enc            = db.Column(db.Text, default='')
+    mail_sender                  = db.Column(db.String(200), default='')
     welcome_video_url            = db.Column(db.String(500), default='')
     how_it_works_video_url       = db.Column(db.String(500), default='')
     start_page_intro             = db.Column(db.Text, default='')

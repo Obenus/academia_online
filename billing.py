@@ -44,7 +44,60 @@ def payments_enabled(app):
     return bool(s and s.payments_enabled and get_stripe_secret(app))
 
 
-def _mail_configured(app):
+def _mail_env_defaults(app):
+    if '_MAIL_ENV' not in app.config:
+        app.config['_MAIL_ENV'] = {
+            'MAIL_SERVER': app.config.get('MAIL_SERVER') or 'smtp.gmail.com',
+            'MAIL_PORT': int(app.config.get('MAIL_PORT') or 587),
+            'MAIL_USE_TLS': bool(app.config.get('MAIL_USE_TLS', True)),
+            'MAIL_USE_SSL': bool(app.config.get('MAIL_USE_SSL', False)),
+            'MAIL_USERNAME': app.config.get('MAIL_USERNAME') or '',
+            'MAIL_PASSWORD': app.config.get('MAIL_PASSWORD') or '',
+            'MAIL_DEFAULT_SENDER': app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME') or '',
+        }
+    return app.config['_MAIL_ENV']
+
+
+def apply_smtp_config(app, mail=None):
+    """Aplica SMTP desde Ajustes (BD) si hay usuario; si no, usa .env/secrets."""
+    env = dict(_mail_env_defaults(app))
+    cfg = dict(env)
+    try:
+        from models import SiteSettings
+        s = SiteSettings.query.first()
+    except Exception:
+        s = None
+        try:
+            from models import db
+            db.session.rollback()
+        except Exception:
+            pass
+
+    db_user = (getattr(s, 'mail_username', None) or '').strip() if s else ''
+    if s and db_user:
+        cfg['MAIL_SERVER'] = (s.mail_server or '').strip() or env['MAIL_SERVER']
+        try:
+            cfg['MAIL_PORT'] = int(s.mail_port or env['MAIL_PORT'] or 587)
+        except (TypeError, ValueError):
+            cfg['MAIL_PORT'] = env['MAIL_PORT']
+        if s.mail_use_tls is not None:
+            cfg['MAIL_USE_TLS'] = bool(s.mail_use_tls)
+        if s.mail_use_ssl is not None:
+            cfg['MAIL_USE_SSL'] = bool(s.mail_use_ssl)
+        cfg['MAIL_USERNAME'] = db_user
+        pwd = decrypt_value(s.mail_password_enc or '', app.config.get('SECRET_KEY', ''))
+        cfg['MAIL_PASSWORD'] = pwd or env['MAIL_PASSWORD']
+        sender = (s.mail_sender or '').strip() or db_user
+        cfg['MAIL_DEFAULT_SENDER'] = sender
+
+    app.config.update(cfg)
+    if mail is not None:
+        mail.init_app(app)
+    return cfg
+
+
+def _mail_configured(app, mail=None):
+    apply_smtp_config(app, mail)
     return bool(app.config.get('MAIL_USERNAME'))
 
 
@@ -57,9 +110,10 @@ def render_template_vars(text, **kwargs):
 
 def send_html_email(app, mail, recipients, subject, body_html):
     from flask_mail import Message as MailMessage
-    if not recipients or not _mail_configured(app):
+    if not recipients or not _mail_configured(app, mail):
         return False
-    msg = MailMessage(subject=subject, recipients=recipients, html=body_html)
+    sender = app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME')
+    msg = MailMessage(subject=subject, recipients=recipients, html=body_html, sender=sender)
     mail.send(msg)
     return True
 

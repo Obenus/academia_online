@@ -11,6 +11,11 @@ BATCH_DELAY_SEC = 2
 
 
 def send_bulk_campaign(app, mail, admin_id, subject, body_html, target='students'):
+    from billing import apply_smtp_config, _mail_configured
+    apply_smtp_config(app, mail)
+    if not _mail_configured(app, mail):
+        raise RuntimeError('SMTP no configurado')
+
     if target == 'all':
         users = User.query.filter_by(status='active').all()
     else:

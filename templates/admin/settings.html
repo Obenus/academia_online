@@ -47,8 +47,56 @@
     </div>
 
     <hr style="border-color:var(--border)"/>
+    <h2 class="text-lg font-semibold" style="color:var(--text1)" id="smtp">✉️ Servidor de correo (SMTP)</h2>
+    <p class="text-xs mb-3" style="color:var(--text4)">
+      Configura el envío de emails desde aquí. La contraseña se guarda cifrada.
+      {% if smtp_from_admin %}
+      Ahora mismo se usa esta configuración del panel.
+      {% else %}
+      Si dejas el usuario vacío, se sigue usando el <code>.env</code> / secrets del servidor.
+      {% endif %}
+      Puerto 587: marca TLS. Puerto 465: marca SSL y desmarca TLS.
+    </p>
+    <div class="grid sm:grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Servidor</label>
+        <input type="text" name="mail_server" class="input" value="{{ s.mail_server or smtp.MAIL_SERVER or 'smtp.gmail.com' }}" placeholder="smtp.gmail.com"/>
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Puerto</label>
+        <input type="number" name="mail_port" class="input" value="{{ s.mail_port or smtp.MAIL_PORT or 587 }}" min="1" max="65535"/>
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Usuario / email</label>
+        <input type="text" name="mail_username" class="input" value="{{ s.mail_username or smtp.MAIL_USERNAME or '' }}" placeholder="tu_correo@gmail.com" autocomplete="off"/>
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Contraseña</label>
+        <input type="password" name="mail_password" class="input" value="" autocomplete="new-password"
+               placeholder="{% if has_mail_password %}Configurada (vacío = mantener){% else %}Contraseña o clave de aplicación{% endif %}"/>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Remitente (opcional)</label>
+        <input type="text" name="mail_sender" class="input" value="{{ s.mail_sender or '' }}" placeholder="Vacío = mismo que el usuario"/>
+      </div>
+    </div>
+    <div class="flex flex-col sm:flex-row gap-3 mt-3 mb-2">
+      <label class="flex items-center gap-2 text-sm cursor-pointer" style="color:var(--text2)">
+        <input type="checkbox" name="mail_use_tls" class="w-4 h-4 rounded border-zinc-300 text-violet-600"
+               {% if (s.mail_username and s.mail_use_tls) or (not s.mail_username and smtp.MAIL_USE_TLS) %}checked{% endif %}/>
+        Usar TLS (STARTTLS, puerto 587)
+      </label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer" style="color:var(--text2)">
+        <input type="checkbox" name="mail_use_ssl" class="w-4 h-4 rounded border-zinc-300 text-violet-600"
+               {% if (s.mail_username and s.mail_use_ssl) or (not s.mail_username and smtp.MAIL_USE_SSL) %}checked{% endif %}/>
+        Usar SSL (puerto 465)
+      </label>
+    </div>
+    <p class="text-[11px] mb-4" style="color:var(--text4)">Gmail: activa 2FA y usa una <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" class="text-violet-600">contraseña de aplicación</a>.</p>
+
+    <hr style="border-color:var(--border)"/>
     <h2 class="text-lg font-semibold" style="color:var(--text1)" id="emails">📧 Emails automáticos</h2>
-    <p class="text-xs mb-3" style="color:var(--text4)">Plantillas HTML con variables <code>{{nombre}}</code>. Requiere SMTP (MAIL_* en Docker). Los recordatorios de eventos los envía el servicio <code>reminder</code> (24 h y 1 h antes).</p>
+    <p class="text-xs mb-3" style="color:var(--text4)">Plantillas HTML con variables <code>{{nombre}}</code>. El SMTP se configura arriba. Los recordatorios de eventos los envía el servicio <code>reminder</code> (24 h y 1 h antes).</p>
 
     <h3 class="text-sm font-semibold" style="color:var(--text1)">Bienvenida (usuario)</h3>
     <p class="text-[11px] mb-2" style="color:var(--text4)">Variables: {% raw %}<code>{{username}}</code>, <code>{{email}}</code>, <code>{{password}}</code>, <code>{{plan_name}}</code>, <code>{{academy_name}}</code>, <code>{{login_url}}</code>, <code>{{welcome_video_block}}</code>{% endraw %}</p>
@@ -174,6 +222,15 @@
     <textarea name="billing_alert_email_body" class="input" rows="6">{{ s.billing_alert_email_body or default_billing_alert_body }}</textarea>
 
     <button type="submit" class="btn btn-primary w-full justify-center">Guardar ajustes</button>
+  </form>
+</div>
+
+<div class="rounded-xl p-6 shadow-sm mt-6" style="background:var(--surface);border:1px solid var(--border)">
+  <h2 class="text-sm font-bold mb-3" style="color:var(--text1)">Enviar email de prueba</h2>
+  <form method="POST" class="flex flex-col sm:flex-row gap-3">
+    <input type="hidden" name="action" value="smtp_test"/>
+    <input type="email" name="test_email" class="input flex-1" placeholder="Email destino" value="{{ current_user.email }}"/>
+    <button type="submit" class="btn btn-secondary">Enviar prueba</button>
   </form>
 </div>
 <script>

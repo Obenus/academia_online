@@ -1283,6 +1283,28 @@ def serve_banner():
 @admin_required
 def admin_settings():
     s = get_settings()
+    from billing import apply_smtp_config, send_html_email
+    if request.method == 'POST' and request.form.get('action') == 'smtp_test':
+        apply_smtp_config(app, mail)
+        to = (request.form.get('test_email') or current_user.email or '').strip()
+        if not to:
+            flash('Indica un email de destino para la prueba.', 'error')
+        else:
+            academy = s.academy_name or app.config.get('ACADEMY_NAME', 'Academia')
+            try:
+                ok = send_html_email(
+                    app, mail, [to],
+                    f'Prueba SMTP — {academy}',
+                    f'<p>Si recibes este mensaje, el SMTP de <strong>{academy}</strong> funciona correctamente.</p>'
+                    f'<p>Servidor: {app.config.get("MAIL_SERVER")} · Puerto: {app.config.get("MAIL_PORT")}</p>',
+                )
+                if ok:
+                    flash(f'Email de prueba enviado a {to}.', 'success')
+                else:
+                    flash('No se pudo enviar. Revisa usuario, contraseña y servidor SMTP.', 'error')
+            except Exception as e:
+                flash(f'Error SMTP: {e}', 'error')
+        return redirect(url_for('admin_settings') + '#smtp')
     if request.method == 'POST':
         s.academy_name          = request.form.get('academy_name', s.academy_name).strip()
         s.community_description = request.form.get('community_description', '').strip()
@@ -1319,7 +1341,21 @@ def admin_settings():
             s.community_image_data, s.community_image_mime = _compress_image(
                 img, max_w=1200, max_h=600, quality=82)
             s.community_image      = ''
+        s.mail_server = request.form.get('mail_server', '').strip()
+        try:
+            port = int(request.form.get('mail_port') or 587)
+            s.mail_port = port if 1 <= port <= 65535 else 587
+        except (TypeError, ValueError):
+            s.mail_port = 587
+        s.mail_use_tls = request.form.get('mail_use_tls') == 'on'
+        s.mail_use_ssl = request.form.get('mail_use_ssl') == 'on'
+        s.mail_username = request.form.get('mail_username', '').strip()
+        s.mail_sender = request.form.get('mail_sender', '').strip()
+        new_pwd = request.form.get('mail_password', '')
+        if new_pwd.strip():
+            s.mail_password_enc = encrypt_value(new_pwd.strip(), app.config.get('SECRET_KEY', ''))
         db.session.commit()
+        apply_smtp_config(app, mail)
         flash('Ajustes guardados.', 'success')
         return redirect(url_for('admin_settings'))
     from billing import (
@@ -1329,6 +1365,8 @@ def admin_settings():
         default_billing_alert_subject, default_billing_alert_body,
     )
     active_users = User.query.filter_by(status='active', role='student').order_by(User.username).all()
+    smtp = apply_smtp_config(app, mail)
+    has_mail_password = bool((s.mail_password_enc or '').strip() or smtp.get('MAIL_PASSWORD'))
     return render_template(
         'admin/settings.html', s=s,
         default_welcome_subject=default_welcome_subject(),
@@ -1340,6 +1378,9 @@ def admin_settings():
         default_billing_alert_subject=default_billing_alert_subject(),
         default_billing_alert_body=default_billing_alert_body(),
         active_users=active_users,
+        smtp=smtp,
+        has_mail_password=has_mail_password,
+        smtp_from_admin=bool((s.mail_username or '').strip()),
     )
 
 
@@ -1434,6 +1475,30 @@ def admin_commercial_landing():
 def admin_commercial_leads():
     leads = CommercialLead.query.order_by(CommercialLead.created_at.desc()).all()
     return render_template('admin/commercial_leads.html', leads=leads)
+
+
+@app.route('/admin/landing-comercial/leads/borrar', methods=['POST'])
+@login_required
+@admin_required
+def admin_commercial_leads_delete():
+    ids = []
+    one = request.form.get('delete_one', type=int)
+    if one:
+        ids = [one]
+    else:
+        for raw in request.form.getlist('ids'):
+            try:
+                ids.append(int(raw))
+            except (TypeError, ValueError):
+                continue
+    ids = list(dict.fromkeys(ids))
+    if not ids:
+        flash('No hay leads seleccionados.', 'error')
+        return redirect(url_for('admin_commercial_leads'))
+    deleted = CommercialLead.query.filter(CommercialLead.id.in_(ids)).delete(synchronize_session=False)
+    db.session.commit()
+    flash(f'{deleted} lead(s) eliminado(s).', 'success')
+    return redirect(url_for('admin_commercial_leads'))
 
 
 @app.route('/admin/landing-comercial/leads.csv')
@@ -4743,6 +4808,13 @@ else:
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_body TEXT DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_whatsapp_url VARCHAR(500) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS library_catalog_order TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_server VARCHAR(200) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_port INTEGER DEFAULT 587"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_use_tls BOOLEAN DEFAULT TRUE"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_use_ssl BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_username VARCHAR(200) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_password_enc TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_sender VARCHAR(200) DEFAULT ''"))
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS commercial_lead (
                         id SERIAL PRIMARY KEY,
@@ -4921,6 +4993,13 @@ else:
                 print('[backfill] Puntos completados correctamente.')
         except Exception as e:
             print(f'[seed] ERROR en backfill points: {e}')
+
+try:
+    with app.app_context():
+        from billing import apply_smtp_config as _apply_smtp
+        _apply_smtp(app, mail)
+except Exception as e:
+    print(f'[mail] SMTP de ajustes no cargado: {e}')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5002))

@@ -170,6 +170,13 @@ def run_migrations(conn):
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_body TEXT DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_whatsapp_url VARCHAR(500) DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS library_catalog_order TEXT DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_server VARCHAR(200) DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_port INTEGER DEFAULT 587",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_use_tls BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_use_ssl BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_username VARCHAR(200) DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_password_enc TEXT DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_sender VARCHAR(200) DEFAULT ''",
         """CREATE TABLE IF NOT EXISTS commercial_lead (
             id SERIAL PRIMARY KEY,
             name VARCHAR(200) NOT NULL,
