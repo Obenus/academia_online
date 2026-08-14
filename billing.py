@@ -77,12 +77,53 @@ def format_smtp_sender(display_name, email, override=''):
     return addr
 
 
-def _normalize_smtp_cfg(cfg):
-    """Docker no puede usar localhost del host; 465=SSL, 587=TLS."""
+def _public_hostname(url):
+    from urllib.parse import urlparse
+    raw = (url or '').strip()
+    if not raw:
+        return ''
+    if '://' not in raw:
+        raw = f'https://{raw}'
+    host = (urlparse(raw).hostname or '').strip().lower()
+    if host.startswith('www.'):
+        host = host[4:]
+    return host
+
+
+def _smtp_host_for_docker(server, public_base_url=''):
+    """Si el SMTP es el mismo VPS que la web, Docker debe hablar con el host, no con la IP pública."""
+    server = (server or '').strip()
+    low = server.lower()
+    if low in ('', 'localhost', '127.0.0.1', '::1'):
+        return 'host.docker.internal'
+    if low == 'host.docker.internal':
+        return server
+
+    pub = _public_hostname(public_base_url)
+    mail_host = low[4:] if low.startswith('www.') else low
+    if pub and (mail_host == pub or mail_host.endswith('.' + pub) or pub.endswith('.' + mail_host)):
+        return 'host.docker.internal'
+
+    try:
+        import socket
+        mail_ips = {ai[4][0] for ai in socket.getaddrinfo(server, None, socket.AF_INET)}
+        if mail_ips & {'127.0.0.1', '0.0.0.0'}:
+            return 'host.docker.internal'
+        try:
+            host_ip = socket.gethostbyname('host.docker.internal')
+            if host_ip in mail_ips:
+                return 'host.docker.internal'
+        except OSError:
+            pass
+    except OSError:
+        pass
+    return server
+
+
+def _normalize_smtp_cfg(cfg, public_base_url=''):
+    """Docker no puede usar localhost/IP pública del mismo VPS; 465=SSL, 587=TLS."""
     server = (cfg.get('MAIL_SERVER') or '').strip()
-    if server.lower() in ('localhost', '127.0.0.1', '::1'):
-        server = 'host.docker.internal'
-    cfg['MAIL_SERVER'] = server
+    cfg['MAIL_SERVER'] = _smtp_host_for_docker(server, public_base_url)
     try:
         port = int(cfg.get('MAIL_PORT') or 587)
     except (TypeError, ValueError):
@@ -145,7 +186,7 @@ def apply_smtp_config(app, mail=None):
             env.get('MAIL_DEFAULT_SENDER') or '',
         )
 
-    cfg = _normalize_smtp_cfg(cfg)
+    cfg = _normalize_smtp_cfg(cfg, app.config.get('PUBLIC_BASE_URL') or '')
     app.config.update(cfg)
     if mail is not None:
         mail.init_app(app)
@@ -170,8 +211,19 @@ def send_html_email(app, mail, recipients, subject, body_html):
         return False
     sender = app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME')
     msg = MailMessage(subject=subject, recipients=recipients, html=body_html, sender=sender)
-    mail.send(msg)
-    return True
+    try:
+        mail.send(msg)
+        return True
+    except OSError as e:
+        refused = getattr(e, 'errno', None) == 111 or 'Connection refused' in str(e)
+        server = (app.config.get('MAIL_SERVER') or '').strip()
+        if refused and server and server != 'host.docker.internal':
+            print(f'[mail] {server}:{app.config.get("MAIL_PORT")} connection refused; reintento vía host.docker.internal')
+            app.config['MAIL_SERVER'] = 'host.docker.internal'
+            mail.init_app(app)
+            mail.send(msg)
+            return True
+        raise
 
 
 def default_welcome_subject():
