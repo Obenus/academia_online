@@ -6,3 +6,5 @@ secrets/
 !secrets/.gitkeep
 backups/
 !backups/.gitkeep
+backup_*.sql
+*.sql

@@ -8,8 +8,9 @@ cd "$(dirname "$(readlink -f "$0")")"
 echo "=== Academia: actualizar a última versión ==="
 echo "Directorio: $(pwd)"
 
-if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Hay cambios locales sin commitear. Revisa con: git status"
+# Solo aborta si hay cambios en archivos YA versionados (no por .sql o logo locales)
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+  echo "Hay cambios locales en archivos del proyecto. Revisa con: git status"
   echo "No se continúa para no pisar nada."
   exit 1
 fi
