@@ -2,7 +2,7 @@
 
 Plataforma web de academia y comunidad de suscripción construida con **Flask** y **PostgreSQL**. Incluye landing de conversión, biblioteca de vídeo, foro, calendario de encuentros, recursos descargables, panel de administración, pagos por suscripción con **Stripe** (precios España/internacional automáticos), backups automáticos y despliegue con **Docker**.
 
-**Versión actual:** `v2.2.0`
+**Versión actual:** `v2.4.2`
 
 Repositorio: [github.com/Obenus/academia_online](https://github.com/Obenus/academia_online)
 
@@ -164,6 +164,15 @@ Abre: **http://localhost:8080/login**
 |----------|-------------|
 | App web | 8080 |
 | PostgreSQL | 5433 |
+
+### Actualizar producción (sin borrar datos)
+
+```bash
+cd /opt/academia_online   # o la ruta del proyecto
+./actualizar.sh
+```
+
+El script hace copia SQL, `git pull`, rebuild de `app` y workers. **No** usa `docker compose down -v`.
 
 ### Tras un rebuild
 
