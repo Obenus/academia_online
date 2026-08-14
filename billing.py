@@ -90,40 +90,80 @@ def _public_hostname(url):
     return host
 
 
-def _smtp_host_for_docker(server, public_base_url=''):
-    """Si el SMTP es el mismo VPS que la web, Docker debe hablar con el host, no con la IP pública."""
-    server = (server or '').strip()
-    low = server.lower()
-    if low in ('', 'localhost', '127.0.0.1', '::1'):
-        return 'host.docker.internal'
-    if low == 'host.docker.internal':
-        return server
+def _ipv4_from_route_hex(value):
+    return '.'.join(str(int(value[i:i + 2], 16)) for i in (6, 4, 2, 0))
 
-    pub = _public_hostname(public_base_url)
-    mail_host = low[4:] if low.startswith('www.') else low
-    if pub and (mail_host == pub or mail_host.endswith('.' + pub) or pub.endswith('.' + mail_host)):
-        return 'host.docker.internal'
 
+def _docker_host_ipv4_candidates():
+    """IPs del host vistas desde el contenedor (pasarela Compose, no docker0)."""
+    ips = []
     try:
-        import socket
-        mail_ips = {ai[4][0] for ai in socket.getaddrinfo(server, None, socket.AF_INET)}
-        if mail_ips & {'127.0.0.1', '0.0.0.0'}:
-            return 'host.docker.internal'
-        try:
-            host_ip = socket.gethostbyname('host.docker.internal')
-            if host_ip in mail_ips:
-                return 'host.docker.internal'
-        except OSError:
-            pass
+        with open('/proc/net/route', encoding='utf-8') as fh:
+            next(fh, None)
+            for line in fh:
+                parts = line.split()
+                if len(parts) >= 3 and parts[1] == '00000000':
+                    gw = _ipv4_from_route_hex(parts[2])
+                    if gw and not gw.startswith('0.') and gw != '127.0.0.1':
+                        ips.append(gw)
+                        break
     except OSError:
         pass
+    try:
+        import socket
+        hip = socket.gethostbyname('host.docker.internal')
+        if hip and hip not in ips and hip != '127.0.0.1':
+            ips.append(hip)
+    except OSError:
+        pass
+    for fallback in ('172.17.0.1', '172.18.0.1'):
+        if fallback not in ips:
+            ips.append(fallback)
+    return ips or ['172.17.0.1']
+
+
+def _smtp_tcp_ok(host, port, timeout=1.5):
+    import socket
+    try:
+        with socket.create_connection((host, int(port)), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _reachable_docker_host_smtp(port):
+    for ip in _docker_host_ipv4_candidates():
+        if _smtp_tcp_ok(ip, port):
+            print(f'[mail] SMTP del host alcanzable en {ip}:{port}')
+            return ip
+    return _docker_host_ipv4_candidates()[0]
+
+
+def _smtp_host_for_docker(server, public_base_url='', port=587):
+    """Si el SMTP es el mismo VPS que la web, usar la pasarela Docker (IPv4)."""
+    server = (server or '').strip()
+    low = server.lower()
+    use_host = low in ('', 'localhost', '127.0.0.1', '::1', 'host.docker.internal')
+    if not use_host:
+        pub = _public_hostname(public_base_url)
+        mail_host = low[4:] if low.startswith('www.') else low
+        if pub and (mail_host == pub or mail_host.endswith('.' + pub) or pub.endswith('.' + mail_host)):
+            use_host = True
+        else:
+            try:
+                import socket
+                mail_ips = {ai[4][0] for ai in socket.getaddrinfo(server, None, socket.AF_INET)}
+                if mail_ips & {'127.0.0.1', '0.0.0.0'}:
+                    use_host = True
+            except OSError:
+                pass
+    if use_host:
+        return _reachable_docker_host_smtp(port)
     return server
 
 
 def _normalize_smtp_cfg(cfg, public_base_url=''):
     """Docker no puede usar localhost/IP pública del mismo VPS; 465=SSL, 587=TLS."""
-    server = (cfg.get('MAIL_SERVER') or '').strip()
-    cfg['MAIL_SERVER'] = _smtp_host_for_docker(server, public_base_url)
     try:
         port = int(cfg.get('MAIL_PORT') or 587)
     except (TypeError, ValueError):
@@ -139,6 +179,8 @@ def _normalize_smtp_cfg(cfg, public_base_url=''):
         cfg['MAIL_USE_TLS'] = True
     if cfg['MAIL_USE_SSL'] and cfg['MAIL_USE_TLS']:
         cfg['MAIL_USE_TLS'] = False
+    server = (cfg.get('MAIL_SERVER') or '').strip()
+    cfg['MAIL_SERVER'] = _smtp_host_for_docker(server, public_base_url, port)
     return cfg
 
 
@@ -216,13 +258,15 @@ def send_html_email(app, mail, recipients, subject, body_html):
         return True
     except OSError as e:
         refused = getattr(e, 'errno', None) == 111 or 'Connection refused' in str(e)
-        server = (app.config.get('MAIL_SERVER') or '').strip()
-        if refused and server and server != 'host.docker.internal':
-            print(f'[mail] {server}:{app.config.get("MAIL_PORT")} connection refused; reintento vía host.docker.internal')
-            app.config['MAIL_SERVER'] = 'host.docker.internal'
-            mail.init_app(app)
-            mail.send(msg)
-            return True
+        if refused:
+            port = app.config.get('MAIL_PORT') or 587
+            alt = _reachable_docker_host_smtp(port)
+            if alt and alt != (app.config.get('MAIL_SERVER') or ''):
+                print(f'[mail] reintento SMTP en {alt}:{port}')
+                app.config['MAIL_SERVER'] = alt
+                mail.init_app(app)
+                mail.send(msg)
+                return True
         raise
 
 
