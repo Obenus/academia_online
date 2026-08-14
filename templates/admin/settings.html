@@ -77,7 +77,11 @@
       </div>
       <div class="sm:col-span-2">
         <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Remitente (opcional)</label>
-        <input type="text" name="mail_sender" class="input" value="{{ s.mail_sender or '' }}" placeholder="Vacío = mismo que el usuario"/>
+        <input type="text" name="mail_sender" class="input" value="{{ s.mail_sender or '' }}" placeholder="NuncaTanYo &lt;info@tudominio.com&gt;"/>
+        <p class="text-[11px] mt-1" style="color:var(--text4)">
+          Vacío = nombre de la academia + email de usuario. También puedes poner
+          <code>Nombre visible &lt;correo@dominio.com&gt;</code>.
+        </p>
       </div>
     </div>
     <div class="flex flex-col sm:flex-row gap-3 mt-3 mb-2">

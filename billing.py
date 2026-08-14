@@ -58,6 +58,25 @@ def _mail_env_defaults(app):
     return app.config['_MAIL_ENV']
 
 
+def format_smtp_sender(display_name, email, override=''):
+    """From: «Nombre de la web <email>». override puede ser email, nombre o 'Nombre <email>'."""
+    import re
+    name = (display_name or '').strip()
+    addr = (email or '').strip()
+    raw = (override or '').strip()
+    m = re.match(r'^(.+?)\s*<([^>]+)>$', raw)
+    if m:
+        name = m.group(1).strip().strip('"').strip("'")
+        addr = m.group(2).strip()
+    elif '@' in raw:
+        addr = raw
+    elif raw:
+        name = raw
+    if name and addr:
+        return (name, addr)
+    return addr
+
+
 def apply_smtp_config(app, mail=None):
     """Aplica SMTP desde Ajustes (BD) si hay usuario; si no, usa .env/secrets."""
     env = dict(_mail_env_defaults(app))
@@ -74,6 +93,11 @@ def apply_smtp_config(app, mail=None):
             pass
 
     db_user = (getattr(s, 'mail_username', None) or '').strip() if s else ''
+    academy = ''
+    if s:
+        academy = (s.academy_name or '').strip()
+    academy = academy or (app.config.get('ACADEMY_NAME') or '').strip()
+
     if s and db_user:
         cfg['MAIL_SERVER'] = (s.mail_server or '').strip() or env['MAIL_SERVER']
         try:
@@ -87,8 +111,15 @@ def apply_smtp_config(app, mail=None):
         cfg['MAIL_USERNAME'] = db_user
         pwd = decrypt_value(s.mail_password_enc or '', app.config.get('SECRET_KEY', ''))
         cfg['MAIL_PASSWORD'] = pwd or env['MAIL_PASSWORD']
-        sender = (s.mail_sender or '').strip() or db_user
-        cfg['MAIL_DEFAULT_SENDER'] = sender
+        cfg['MAIL_DEFAULT_SENDER'] = format_smtp_sender(
+            academy, db_user, (s.mail_sender or '').strip(),
+        )
+    else:
+        cfg['MAIL_DEFAULT_SENDER'] = format_smtp_sender(
+            academy,
+            env.get('MAIL_USERNAME') or '',
+            env.get('MAIL_DEFAULT_SENDER') or '',
+        )
 
     app.config.update(cfg)
     if mail is not None:
