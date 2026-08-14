@@ -24,6 +24,8 @@ services:
       MAIL_USERNAME_FILE: /run/secrets/mail_username
       MAIL_PASSWORD_FILE: /run/secrets/mail_password
       STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./secrets:/run/secrets:ro
       - ./backups:/app/backups
@@ -50,6 +52,8 @@ services:
       SECRET_KEY_FILE: /run/secrets/secret_key
       MAIL_USERNAME_FILE: /run/secrets/mail_username
       MAIL_PASSWORD_FILE: /run/secrets/mail_password
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./secrets:/run/secrets:ro
     depends_on:
@@ -76,6 +80,8 @@ services:
       MAIL_USERNAME_FILE: /run/secrets/mail_username
       MAIL_PASSWORD_FILE: /run/secrets/mail_password
       REMINDER_INTERVAL_SEC: ${REMINDER_INTERVAL_SEC:-300}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./secrets:/run/secrets:ro
     depends_on:

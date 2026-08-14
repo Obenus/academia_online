@@ -1303,7 +1303,16 @@ def admin_settings():
                 else:
                     flash('No se pudo enviar. Revisa usuario, contraseña y servidor SMTP.', 'error')
             except Exception as e:
-                flash(f'Error SMTP: {e}', 'error')
+                host = app.config.get('MAIL_SERVER')
+                port = app.config.get('MAIL_PORT')
+                hint = ''
+                err = str(e)
+                if '111' in err or 'Connection refused' in err:
+                    hint = (
+                        ' El contenedor no alcanza ese servidor. En Ajustes pon el hostname público '
+                        '(ej. mail.tudominio.com), no localhost. Puerto 465 = SSL; 587 = TLS.'
+                    )
+                flash(f'Error SMTP ({host}:{port}): {e}.{hint}', 'error')
         return redirect(url_for('admin_settings') + '#smtp')
     if request.method == 'POST':
         s.academy_name          = request.form.get('academy_name', s.academy_name).strip()

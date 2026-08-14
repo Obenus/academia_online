@@ -77,6 +77,30 @@ def format_smtp_sender(display_name, email, override=''):
     return addr
 
 
+def _normalize_smtp_cfg(cfg):
+    """Docker no puede usar localhost del host; 465=SSL, 587=TLS."""
+    server = (cfg.get('MAIL_SERVER') or '').strip()
+    if server.lower() in ('localhost', '127.0.0.1', '::1'):
+        server = 'host.docker.internal'
+    cfg['MAIL_SERVER'] = server
+    try:
+        port = int(cfg.get('MAIL_PORT') or 587)
+    except (TypeError, ValueError):
+        port = 587
+    cfg['MAIL_PORT'] = port
+    cfg['MAIL_USE_TLS'] = bool(cfg.get('MAIL_USE_TLS'))
+    cfg['MAIL_USE_SSL'] = bool(cfg.get('MAIL_USE_SSL'))
+    if port == 465:
+        cfg['MAIL_USE_SSL'] = True
+        cfg['MAIL_USE_TLS'] = False
+    elif port == 587:
+        cfg['MAIL_USE_SSL'] = False
+        cfg['MAIL_USE_TLS'] = True
+    if cfg['MAIL_USE_SSL'] and cfg['MAIL_USE_TLS']:
+        cfg['MAIL_USE_TLS'] = False
+    return cfg
+
+
 def apply_smtp_config(app, mail=None):
     """Aplica SMTP desde Ajustes (BD) si hay usuario; si no, usa .env/secrets."""
     env = dict(_mail_env_defaults(app))
@@ -121,6 +145,7 @@ def apply_smtp_config(app, mail=None):
             env.get('MAIL_DEFAULT_SENDER') or '',
         )
 
+    cfg = _normalize_smtp_cfg(cfg)
     app.config.update(cfg)
     if mail is not None:
         mail.init_app(app)

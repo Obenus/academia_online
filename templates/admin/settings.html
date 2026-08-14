@@ -55,7 +55,7 @@
       {% else %}
       Si dejas el usuario vacío, se sigue usando el <code>.env</code> / secrets del servidor.
       {% endif %}
-      Puerto 587: marca TLS. Puerto 465: marca SSL y desmarca TLS.
+      Puerto 587: TLS. Puerto 465: SSL. Desde Docker no uses localhost; pon mail.tudominio.com (o el SMTP que te dé el hosting).
     </p>
     <div class="grid sm:grid-cols-2 gap-3">
       <div>
