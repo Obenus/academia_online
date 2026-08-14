@@ -157,17 +157,45 @@ def _is_external_smtp(server):
 
 
 def _smtp_host_for_docker(server, public_base_url='', port=587, local_relay=False):
-    """Solo reescribe a relé local si es localhost o si el admin marca Plesk."""
+    """Reescribe a relé local: localhost, mismo dominio que la web, o casilla Plesk."""
     server = (server or '').strip()
     low = server.lower()
     if _is_external_smtp(low):
         return server, port
-    use_host = low in ('', 'localhost', '127.0.0.1', '::1', 'host.docker.internal')
-    if local_relay:
-        use_host = True
+    use_host = local_relay or low in (
+        '', 'localhost', '127.0.0.1', '::1', 'host.docker.internal',
+    )
+    if not use_host:
+        pub = _public_hostname(public_base_url)
+        mail_host = low[4:] if low.startswith('www.') else low
+        if pub and (
+            mail_host == pub
+            or mail_host.endswith('.' + pub)
+            or pub.endswith('.' + mail_host)
+        ):
+            use_host = True
+        else:
+            try:
+                import socket
+                mail_ips = {ai[4][0] for ai in socket.getaddrinfo(server, None, socket.AF_INET)}
+                if mail_ips & {'127.0.0.1', '0.0.0.0'}:
+                    use_host = True
+            except OSError:
+                pass
     if use_host:
         return _local_smtp_endpoint(port)
     return server, port
+
+
+def _local_unauth_cfg(cfg):
+    """Postfix en 127.0.0.1:25 acepta mynetworks; SASL en 587 falla con MX externo."""
+    if not cfg.get('MAIL_DEFAULT_SENDER'):
+        cfg['MAIL_DEFAULT_SENDER'] = cfg.get('MAIL_USERNAME') or ''
+    cfg['MAIL_USERNAME'] = ''
+    cfg['MAIL_PASSWORD'] = ''
+    cfg['MAIL_USE_TLS'] = False
+    cfg['MAIL_USE_SSL'] = False
+    return cfg
 
 
 def _normalize_smtp_cfg(cfg, public_base_url=''):
@@ -194,8 +222,7 @@ def _normalize_smtp_cfg(cfg, public_base_url=''):
     cfg['MAIL_SERVER'] = host
     cfg['MAIL_PORT'] = int(rport)
     if int(rport) == 2525:
-        cfg['MAIL_USE_SSL'] = False
-        cfg['MAIL_USE_TLS'] = True
+        _local_unauth_cfg(cfg)
     elif int(rport) == 465:
         cfg['MAIL_USE_SSL'] = True
         cfg['MAIL_USE_TLS'] = False
@@ -260,7 +287,7 @@ def apply_smtp_config(app, mail=None):
 
 def _mail_configured(app, mail=None):
     apply_smtp_config(app, mail)
-    return bool(app.config.get('MAIL_USERNAME'))
+    return bool(app.config.get('MAIL_USERNAME') or app.config.get('MAIL_DEFAULT_SENDER'))
 
 
 def render_template_vars(text, **kwargs):
@@ -268,6 +295,17 @@ def render_template_vars(text, **kwargs):
         text = text.replace('{{' + key + '}}', str(val or ''))
         text = text.replace('{{ ' + key + ' }}', str(val or ''))
     return text
+
+
+def _switch_to_local_unauth(app, mail):
+    alt_host, alt_port = _local_smtp_endpoint(app.config.get('MAIL_PORT') or 25)
+    print(f'[mail] SMTP local sin AUTH en {alt_host}:{alt_port}')
+    app.config['MAIL_SERVER'] = alt_host
+    app.config['MAIL_PORT'] = int(alt_port)
+    _local_unauth_cfg(app.config)
+    if mail is not None:
+        mail.init_app(app)
+    return alt_host, int(alt_port)
 
 
 def send_html_email(app, mail, recipients, subject, body_html):
@@ -279,22 +317,18 @@ def send_html_email(app, mail, recipients, subject, body_html):
     try:
         mail.send(msg)
         return True
-    except OSError as e:
-        refused = getattr(e, 'errno', None) == 111 or 'Connection refused' in str(e)
-        if refused:
-            alt_host, alt_port = _local_smtp_endpoint(app.config.get('MAIL_PORT') or 587)
-            cur = (app.config.get('MAIL_SERVER'), int(app.config.get('MAIL_PORT') or 0))
-            if (alt_host, int(alt_port)) != cur:
-                print(f'[mail] reintento SMTP en {alt_host}:{alt_port}')
-                app.config['MAIL_SERVER'] = alt_host
-                app.config['MAIL_PORT'] = int(alt_port)
-                if int(alt_port) == 2525:
-                    app.config['MAIL_USE_SSL'] = False
-                    app.config['MAIL_USE_TLS'] = True
-                mail.init_app(app)
-                mail.send(msg)
-                return True
-        raise
+    except Exception as e:
+        err = str(e)
+        orig = (app.config.get('MAIL_SERVER') or '')
+        if _is_external_smtp(orig):
+            raise
+        refused = getattr(e, 'errno', None) == 111 or 'Connection refused' in err
+        auth_fail = '535' in err or 'authentication' in err.lower()
+        if not (refused or auth_fail):
+            raise
+        _switch_to_local_unauth(app, mail)
+        mail.send(msg)
+        return True
 
 
 def default_welcome_subject():

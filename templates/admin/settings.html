@@ -55,13 +55,14 @@
       {% else %}
       Si dejas el usuario vacío, se sigue usando el <code>.env</code> / secrets del servidor.
       {% endif %}
-      Puerto 587: TLS. Puerto 465: SSL.
-      Con Google Workspace usa <code>smtp.gmail.com</code> (no el dominio de la web).
+      Si el correo sale por <strong>Plesk de este VPS</strong>, pon el dominio de la web
+      como servidor y marca la casilla de abajo. Docker envía por el relé local
+      (sin contraseña SASL). Gmail/Workspace: <code>smtp.gmail.com</code> y casilla sin marcar.
     </p>
     <div class="grid sm:grid-cols-2 gap-3">
       <div>
         <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Servidor</label>
-        <input type="text" name="mail_server" class="input" value="{{ s.mail_server or smtp.MAIL_SERVER or 'smtp.gmail.com' }}" placeholder="smtp.gmail.com"/>
+        <input type="text" name="mail_server" class="input" value="{{ s.mail_server or smtp.MAIL_SERVER or '' }}" placeholder="nuncatanyo.com o smtp.gmail.com"/>
       </div>
       <div>
         <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Puerto</label>
@@ -69,12 +70,12 @@
       </div>
       <div>
         <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Usuario / email</label>
-        <input type="text" name="mail_username" class="input" value="{{ s.mail_username or smtp.MAIL_USERNAME or '' }}" placeholder="tu_correo@gmail.com" autocomplete="off"/>
+        <input type="text" name="mail_username" class="input" value="{{ s.mail_username or smtp.MAIL_USERNAME or '' }}" placeholder="noreply@tudominio.com" autocomplete="off"/>
       </div>
       <div>
         <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Contraseña</label>
         <input type="password" name="mail_password" class="input" value="" autocomplete="new-password"
-               placeholder="{% if has_mail_password %}Configurada (vacío = mantener){% else %}Contraseña o clave de aplicación{% endif %}"/>
+               placeholder="{% if has_mail_password %}Configurada (vacío = mantener){% else %}Plesk: vacía · Gmail: clave de aplicación{% endif %}"/>
       </div>
       <div class="sm:col-span-2">
         <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Remitente (opcional)</label>
@@ -88,8 +89,8 @@
     <div class="flex flex-col sm:flex-row gap-3 mt-3 mb-2">
       <label class="flex items-center gap-2 text-sm cursor-pointer" style="color:var(--text2)">
         <input type="checkbox" name="mail_local_relay" class="w-4 h-4 rounded border-zinc-300 text-violet-600"
-               {% if s.mail_local_relay %}checked{% endif %}/>
-        El SMTP es el de este servidor (Plesk). Déjalo <strong>sin marcar</strong> si usas Gmail / Google Workspace.
+               {% if s.mail_local_relay or (s.mail_server and 'gmail' not in s.mail_server|lower and 'google' not in s.mail_server|lower) %}checked{% endif %}/>
+        El SMTP es el de este servidor (Plesk). Márcala para enviar por el VPS; quítala solo si usas Gmail.
       </label>
     </div>
     <div class="flex flex-col sm:flex-row gap-3 mt-3 mb-2">

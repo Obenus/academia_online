@@ -1309,8 +1309,9 @@ def admin_settings():
                 err = str(e)
                 if '535' in err or 'authentication' in err.lower():
                     hint = (
-                        ' Usuario o contraseña rechazados. Con MX en Google usa smtp.gmail.com '
-                        'y una contraseña de aplicación, no el dominio Plesk.'
+                        ' Postfix rechazó SASL. En Plesk local no hace falta contraseña: '
+                        'marca «SMTP de este servidor», usuario = remitente (noreply@…) '
+                        'y deja la contraseña vacía.'
                     )
                 flash(f'Error SMTP ({host}:{port}): {e}.{hint}', 'error')
         return redirect(url_for('admin_settings') + '#smtp')

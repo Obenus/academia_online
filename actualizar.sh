@@ -33,6 +33,12 @@ if command -v iptables >/dev/null 2>&1; then
   iptables -C INPUT -s 172.16.0.0/12 -p tcp --dport 465 -j ACCEPT 2>/dev/null \
     || iptables -I INPUT -s 172.16.0.0/12 -p tcp --dport 465 -j ACCEPT \
     || true
+  iptables -C INPUT -s 172.16.0.0/12 -p tcp --dport 2525 -j ACCEPT 2>/dev/null \
+    || iptables -I INPUT -s 172.16.0.0/12 -p tcp --dport 2525 -j ACCEPT \
+    || true
+  iptables -C INPUT -p tcp --dport 2525 -j DROP 2>/dev/null \
+    || iptables -A INPUT -p tcp --dport 2525 -j DROP \
+    || true
 fi
 
 echo "→ Parando workers (billing, reminder, backup)"
