@@ -1625,7 +1625,7 @@ def _render_commercial_landing():
 
 
 @app.route('/oferta', methods=['GET', 'POST'])
-@limiter.limit('30 per hour')
+@limiter.limit('20 per hour', methods=['POST'])
 def commercial_landing_oferta():
     s = get_settings()
     slug = normalize_slug(getattr(s, 'commercial_landing_slug', None), 'oferta')
@@ -2809,6 +2809,10 @@ def forbidden(e):
 @app.errorhandler(404)
 def not_found(e):
     return render_template('errors/404.html'), 404
+
+@app.errorhandler(429)
+def too_many_requests(e):
+    return render_template('errors/429.html'), 429
 
 @app.errorhandler(500)
 def server_error(e):
@@ -4723,7 +4727,7 @@ Cursos:          {course_count}
 # Inicializar BD siempre (tanto con gunicorn como directo)
 
 @app.route('/<slug>', methods=['GET', 'POST'])
-@limiter.limit('30 per hour')
+@limiter.limit('20 per hour', methods=['POST'])
 def commercial_landing(slug):
     """Slug editable de la landing comercial (p. ej. /oferta o /promo)."""
     import re as _re

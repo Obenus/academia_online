@@ -19,6 +19,8 @@ def init_security(app):
     csrf.init_app(app)
     limiter.init_app(app)
     _init_talisman(app, force_https=secure)
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 
 def _session_secure(app):
