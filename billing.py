@@ -132,17 +132,17 @@ def _smtp_tcp_ok(host, port, timeout=1.5):
 
 
 def _local_smtp_endpoint(preferred_port):
-    """Host local: primero el relé Compose; si no, pasarela/587/465."""
-    if _smtp_tcp_ok('smtp-relay', 2525):
-        print('[mail] SMTP vía relé smtp-relay:2525')
-        return 'smtp-relay', 2525
+    """Host local: relé en :2525 (red del host) o 587/465 si el firewall lo permite."""
     for ip in _docker_host_ipv4_candidates():
-        for p in (preferred_port, 587, 465, 2525):
+        if _smtp_tcp_ok(ip, 2525):
+            print(f'[mail] SMTP vía relé del host {ip}:2525')
+            return ip, 2525
+        for p in (preferred_port, 587, 465):
             if _smtp_tcp_ok(ip, p):
                 print(f'[mail] SMTP del host alcanzable en {ip}:{p}')
                 return ip, int(p)
-    print('[mail] SMTP local no responde; se usará smtp-relay:2525')
-    return 'smtp-relay', 2525
+    print('[mail] SMTP local no responde; se usará 172.18.0.1:2525')
+    return '172.18.0.1', 2525
 
 
 def _smtp_host_for_docker(server, public_base_url='', port=587):

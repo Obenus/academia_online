@@ -39,8 +39,7 @@ services:
       context: .
       dockerfile: Dockerfile.smtp-relay
     container_name: miacademia-smtp-relay
-    pid: host
-    privileged: true
+    network_mode: host
     restart: unless-stopped
 
   billing:

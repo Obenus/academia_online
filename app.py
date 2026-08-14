@@ -1307,10 +1307,10 @@ def admin_settings():
                 port = app.config.get('MAIL_PORT')
                 hint = ''
                 err = str(e)
-                if '111' in err or 'Connection refused' in err:
+                if '111' in err or 'Connection refused' in err or 'unexpectedly closed' in err.lower():
                     hint = (
-                        ' Postfix no acepta conexiones desde Docker (firewall Plesk). '
-                        'Prueba smtp.gmail.com:587 con una contraseña de aplicación de Google Workspace.'
+                        ' El firewall de Plesk puede estar cortando Docker. '
+                        'Revisa iptables o usa smtp.gmail.com:587 (Google Workspace).'
                     )
                 flash(f'Error SMTP ({host}:{port}): {e}.{hint}', 'error')
         return redirect(url_for('admin_settings') + '#smtp')

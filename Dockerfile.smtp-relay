@@ -1,5 +1,5 @@
 FROM alpine:3.21
-RUN apk add --no-cache socat util-linux
+RUN apk add --no-cache socat
 COPY smtp-relay.sh /smtp-relay.sh
 RUN chmod +x /smtp-relay.sh
 EXPOSE 2525
