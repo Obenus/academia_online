@@ -334,6 +334,7 @@ class SiteSettings(db.Model):
     mail_username                = db.Column(db.String(200), default='')
     mail_password_enc            = db.Column(db.Text, default='')
     mail_sender                  = db.Column(db.String(200), default='')
+    mail_local_relay             = db.Column(db.Boolean, default=False)
     welcome_video_url            = db.Column(db.String(500), default='')
     how_it_works_video_url       = db.Column(db.String(500), default='')
     start_page_intro             = db.Column(db.Text, default='')

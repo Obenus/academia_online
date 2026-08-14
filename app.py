@@ -1307,10 +1307,10 @@ def admin_settings():
                 port = app.config.get('MAIL_PORT')
                 hint = ''
                 err = str(e)
-                if '111' in err or 'Connection refused' in err or 'unexpectedly closed' in err.lower():
+                if '535' in err or 'authentication' in err.lower():
                     hint = (
-                        ' El firewall de Plesk puede estar cortando Docker. '
-                        'Revisa iptables o usa smtp.gmail.com:587 (Google Workspace).'
+                        ' Usuario o contraseña rechazados. Con MX en Google usa smtp.gmail.com '
+                        'y una contraseña de aplicación, no el dominio Plesk.'
                     )
                 flash(f'Error SMTP ({host}:{port}): {e}.{hint}', 'error')
         return redirect(url_for('admin_settings') + '#smtp')
@@ -1360,6 +1360,7 @@ def admin_settings():
         s.mail_use_ssl = request.form.get('mail_use_ssl') == 'on'
         s.mail_username = request.form.get('mail_username', '').strip()
         s.mail_sender = request.form.get('mail_sender', '').strip()
+        s.mail_local_relay = request.form.get('mail_local_relay') == 'on'
         new_pwd = request.form.get('mail_password', '')
         if new_pwd.strip():
             s.mail_password_enc = encrypt_value(new_pwd.strip(), app.config.get('SECRET_KEY', ''))
@@ -4824,6 +4825,7 @@ else:
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_username VARCHAR(200) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_password_enc TEXT DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_sender VARCHAR(200) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_local_relay BOOLEAN DEFAULT FALSE"))
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS commercial_lead (
                         id SERIAL PRIMARY KEY,

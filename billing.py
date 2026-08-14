@@ -145,24 +145,26 @@ def _local_smtp_endpoint(preferred_port):
     return '172.18.0.1', 2525
 
 
-def _smtp_host_for_docker(server, public_base_url='', port=587):
-    """Si el SMTP es el mismo VPS que la web, devolver (host, puerto) alcanzable."""
+_EXTERNAL_SMTP = (
+    'gmail.com', 'google.com', 'outlook.com', 'office365.com',
+    'sendgrid.net', 'mailgun.org', 'amazonaws.com', 'zoho.com',
+)
+
+
+def _is_external_smtp(server):
+    low = (server or '').strip().lower()
+    return any(part in low for part in _EXTERNAL_SMTP)
+
+
+def _smtp_host_for_docker(server, public_base_url='', port=587, local_relay=False):
+    """Solo reescribe a relé local si es localhost o si el admin marca Plesk."""
     server = (server or '').strip()
     low = server.lower()
+    if _is_external_smtp(low):
+        return server, port
     use_host = low in ('', 'localhost', '127.0.0.1', '::1', 'host.docker.internal')
-    if not use_host:
-        pub = _public_hostname(public_base_url)
-        mail_host = low[4:] if low.startswith('www.') else low
-        if pub and (mail_host == pub or mail_host.endswith('.' + pub) or pub.endswith('.' + mail_host)):
-            use_host = True
-        else:
-            try:
-                import socket
-                mail_ips = {ai[4][0] for ai in socket.getaddrinfo(server, None, socket.AF_INET)}
-                if mail_ips & {'127.0.0.1', '0.0.0.0'}:
-                    use_host = True
-            except OSError:
-                pass
+    if local_relay:
+        use_host = True
     if use_host:
         return _local_smtp_endpoint(port)
     return server, port
@@ -186,7 +188,9 @@ def _normalize_smtp_cfg(cfg, public_base_url=''):
     if cfg['MAIL_USE_SSL'] and cfg['MAIL_USE_TLS']:
         cfg['MAIL_USE_TLS'] = False
     server = (cfg.get('MAIL_SERVER') or '').strip()
-    host, rport = _smtp_host_for_docker(server, public_base_url, port)
+    host, rport = _smtp_host_for_docker(
+        server, public_base_url, port, cfg.pop('_MAIL_LOCAL_RELAY', False),
+    )
     cfg['MAIL_SERVER'] = host
     cfg['MAIL_PORT'] = int(rport)
     if int(rport) == 2525:
@@ -238,12 +242,14 @@ def apply_smtp_config(app, mail=None):
         cfg['MAIL_DEFAULT_SENDER'] = format_smtp_sender(
             academy, db_user, (s.mail_sender or '').strip(),
         )
+        cfg['_MAIL_LOCAL_RELAY'] = bool(getattr(s, 'mail_local_relay', False))
     else:
         cfg['MAIL_DEFAULT_SENDER'] = format_smtp_sender(
             academy,
             env.get('MAIL_USERNAME') or '',
             env.get('MAIL_DEFAULT_SENDER') or '',
         )
+        cfg['_MAIL_LOCAL_RELAY'] = False
 
     cfg = _normalize_smtp_cfg(cfg, app.config.get('PUBLIC_BASE_URL') or '')
     app.config.update(cfg)

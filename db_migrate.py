@@ -177,6 +177,7 @@ def run_migrations(conn):
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_username VARCHAR(200) DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_password_enc TEXT DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_sender VARCHAR(200) DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_local_relay BOOLEAN DEFAULT FALSE",
         """CREATE TABLE IF NOT EXISTS commercial_lead (
             id SERIAL PRIMARY KEY,
             name VARCHAR(200) NOT NULL,

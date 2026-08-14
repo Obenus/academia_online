@@ -55,7 +55,8 @@
       {% else %}
       Si dejas el usuario vacío, se sigue usando el <code>.env</code> / secrets del servidor.
       {% endif %}
-      Puerto 587: TLS. Puerto 465: SSL. Desde Docker no uses localhost; pon mail.tudominio.com (o el SMTP que te dé el hosting).
+      Puerto 587: TLS. Puerto 465: SSL.
+      Con Google Workspace usa <code>smtp.gmail.com</code> (no el dominio de la web).
     </p>
     <div class="grid sm:grid-cols-2 gap-3">
       <div>
@@ -83,6 +84,13 @@
           <code>Nombre visible &lt;correo@dominio.com&gt;</code>.
         </p>
       </div>
+    </div>
+    <div class="flex flex-col sm:flex-row gap-3 mt-3 mb-2">
+      <label class="flex items-center gap-2 text-sm cursor-pointer" style="color:var(--text2)">
+        <input type="checkbox" name="mail_local_relay" class="w-4 h-4 rounded border-zinc-300 text-violet-600"
+               {% if s.mail_local_relay %}checked{% endif %}/>
+        El SMTP es el de este servidor (Plesk). Déjalo <strong>sin marcar</strong> si usas Gmail / Google Workspace.
+      </label>
     </div>
     <div class="flex flex-col sm:flex-row gap-3 mt-3 mb-2">
       <label class="flex items-center gap-2 text-sm cursor-pointer" style="color:var(--text2)">
