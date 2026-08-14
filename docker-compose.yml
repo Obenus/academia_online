@@ -34,6 +34,15 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  smtp-relay:
+    build:
+      context: .
+      dockerfile: Dockerfile.smtp-relay
+    container_name: miacademia-smtp-relay
+    pid: host
+    privileged: true
+    restart: unless-stopped
+
   billing:
     build:
       context: .

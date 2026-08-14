@@ -25,11 +25,21 @@ echo "→ git pull origin main"
 git fetch --tags origin
 git pull origin main
 
+echo "→ Permitiendo SMTP desde redes Docker (si el firewall lo bloquea)"
+if command -v iptables >/dev/null 2>&1; then
+  iptables -C INPUT -s 172.16.0.0/12 -p tcp --dport 587 -j ACCEPT 2>/dev/null \
+    || iptables -I INPUT -s 172.16.0.0/12 -p tcp --dport 587 -j ACCEPT \
+    || true
+  iptables -C INPUT -s 172.16.0.0/12 -p tcp --dport 465 -j ACCEPT 2>/dev/null \
+    || iptables -I INPUT -s 172.16.0.0/12 -p tcp --dport 465 -j ACCEPT \
+    || true
+fi
+
 echo "→ Parando workers (billing, reminder, backup)"
 docker compose stop billing reminder backup
 
-echo "→ Rebuild y arranque de la app"
-docker compose up -d --build app
+echo "→ Rebuild y arranque de la app y relé SMTP"
+docker compose up -d --build app smtp-relay
 
 echo "→ Esperando a que /login responda..."
 OK=0

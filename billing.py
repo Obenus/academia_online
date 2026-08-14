@@ -131,16 +131,22 @@ def _smtp_tcp_ok(host, port, timeout=1.5):
         return False
 
 
-def _reachable_docker_host_smtp(port):
+def _local_smtp_endpoint(preferred_port):
+    """Host local: primero el relé Compose; si no, pasarela/587/465."""
+    if _smtp_tcp_ok('smtp-relay', 2525):
+        print('[mail] SMTP vía relé smtp-relay:2525')
+        return 'smtp-relay', 2525
     for ip in _docker_host_ipv4_candidates():
-        if _smtp_tcp_ok(ip, port):
-            print(f'[mail] SMTP del host alcanzable en {ip}:{port}')
-            return ip
-    return _docker_host_ipv4_candidates()[0]
+        for p in (preferred_port, 587, 465, 2525):
+            if _smtp_tcp_ok(ip, p):
+                print(f'[mail] SMTP del host alcanzable en {ip}:{p}')
+                return ip, int(p)
+    print('[mail] SMTP local no responde; se usará smtp-relay:2525')
+    return 'smtp-relay', 2525
 
 
 def _smtp_host_for_docker(server, public_base_url='', port=587):
-    """Si el SMTP es el mismo VPS que la web, usar la pasarela Docker (IPv4)."""
+    """Si el SMTP es el mismo VPS que la web, devolver (host, puerto) alcanzable."""
     server = (server or '').strip()
     low = server.lower()
     use_host = low in ('', 'localhost', '127.0.0.1', '::1', 'host.docker.internal')
@@ -158,8 +164,8 @@ def _smtp_host_for_docker(server, public_base_url='', port=587):
             except OSError:
                 pass
     if use_host:
-        return _reachable_docker_host_smtp(port)
-    return server
+        return _local_smtp_endpoint(port)
+    return server, port
 
 
 def _normalize_smtp_cfg(cfg, public_base_url=''):
@@ -180,7 +186,18 @@ def _normalize_smtp_cfg(cfg, public_base_url=''):
     if cfg['MAIL_USE_SSL'] and cfg['MAIL_USE_TLS']:
         cfg['MAIL_USE_TLS'] = False
     server = (cfg.get('MAIL_SERVER') or '').strip()
-    cfg['MAIL_SERVER'] = _smtp_host_for_docker(server, public_base_url, port)
+    host, rport = _smtp_host_for_docker(server, public_base_url, port)
+    cfg['MAIL_SERVER'] = host
+    cfg['MAIL_PORT'] = int(rport)
+    if int(rport) == 2525:
+        cfg['MAIL_USE_SSL'] = False
+        cfg['MAIL_USE_TLS'] = True
+    elif int(rport) == 465:
+        cfg['MAIL_USE_SSL'] = True
+        cfg['MAIL_USE_TLS'] = False
+    elif int(rport) == 587:
+        cfg['MAIL_USE_SSL'] = False
+        cfg['MAIL_USE_TLS'] = True
     return cfg
 
 
@@ -259,11 +276,15 @@ def send_html_email(app, mail, recipients, subject, body_html):
     except OSError as e:
         refused = getattr(e, 'errno', None) == 111 or 'Connection refused' in str(e)
         if refused:
-            port = app.config.get('MAIL_PORT') or 587
-            alt = _reachable_docker_host_smtp(port)
-            if alt and alt != (app.config.get('MAIL_SERVER') or ''):
-                print(f'[mail] reintento SMTP en {alt}:{port}')
-                app.config['MAIL_SERVER'] = alt
+            alt_host, alt_port = _local_smtp_endpoint(app.config.get('MAIL_PORT') or 587)
+            cur = (app.config.get('MAIL_SERVER'), int(app.config.get('MAIL_PORT') or 0))
+            if (alt_host, int(alt_port)) != cur:
+                print(f'[mail] reintento SMTP en {alt_host}:{alt_port}')
+                app.config['MAIL_SERVER'] = alt_host
+                app.config['MAIL_PORT'] = int(alt_port)
+                if int(alt_port) == 2525:
+                    app.config['MAIL_USE_SSL'] = False
+                    app.config['MAIL_USE_TLS'] = True
                 mail.init_app(app)
                 mail.send(msg)
                 return True
