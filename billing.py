@@ -422,22 +422,19 @@ def _deliver_via_mx(from_addr, recipients, raw, ehlo_name=''):
 
 
 def _force_message_id(raw, domain):
-    """Message-ID con el dominio público, no el hostname Docker."""
+    """Una sola cabecera Message-ID con el dominio público, no el hostname Docker."""
     from email import message_from_bytes
     from email.utils import make_msgid
     if isinstance(raw, str):
         raw = raw.encode('utf-8')
     parsed = message_from_bytes(raw)
-    msgid = make_msgid(domain=domain)
-    if parsed['Message-ID']:
-        parsed.replace_header('Message-ID', msgid)
-    else:
-        parsed['Message-ID'] = msgid
+    while parsed['Message-ID'] is not None:
+        del parsed['Message-ID']
+    parsed['Message-ID'] = make_msgid(domain=domain)
     return parsed.as_bytes()
 
 
 def send_html_email(app, mail, recipients, subject, body_html):
-    from email.utils import make_msgid
     from flask_mail import Message as MailMessage
     if not recipients or not _mail_configured(app, mail):
         return False
@@ -451,13 +448,7 @@ def send_html_email(app, mail, recipients, subject, body_html):
         or (from_addr.rsplit('@', 1)[-1] if '@' in from_addr else '')
         or 'localhost'
     )
-    msg = MailMessage(
-        subject=subject,
-        recipients=recipients,
-        html=body_html,
-        sender=sender,
-        extra_headers={'Message-ID': make_msgid(domain=mail_domain)},
-    )
+    msg = MailMessage(subject=subject, recipients=recipients, html=body_html, sender=sender)
     raw = msg.as_bytes() if hasattr(msg, 'as_bytes') else msg.as_string().encode('utf-8')
     raw = _force_message_id(raw, mail_domain)
     ehlo = mail_domain
