@@ -421,21 +421,49 @@ def _deliver_via_mx(from_addr, recipients, raw, ehlo_name=''):
             raise last_err or RuntimeError(f'Sin entrega MX a {domain}')
 
 
-def _force_message_id(raw, domain):
-    """Una sola cabecera Message-ID con el dominio público, no el hostname Docker."""
-    from email import message_from_bytes
-    from email.utils import make_msgid
-    if isinstance(raw, str):
-        raw = raw.encode('utf-8')
-    parsed = message_from_bytes(raw)
-    while parsed['Message-ID'] is not None:
-        del parsed['Message-ID']
-    parsed['Message-ID'] = make_msgid(domain=domain)
-    return parsed.as_bytes()
+def _html_to_text(html):
+    import re
+    from html import unescape
+    text = re.sub(r'(?i)<br\s*/?>', '\n', html or '')
+    text = re.sub(r'(?i)</p>', '\n\n', text)
+    text = re.sub(r'(?i)</div>', '\n', text)
+    text = re.sub(r'(?i)</li>', '\n', text)
+    text = re.sub(r'<[^>]+>', '', text)
+    text = unescape(text)
+    text = re.sub(r'[ \t]+\n', '\n', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def _format_from_header(sender):
+    from email.utils import formataddr, parseaddr
+    if isinstance(sender, (tuple, list)) and len(sender) >= 2:
+        return formataddr((sender[0] or '', sender[1] or ''))
+    name, addr = parseaddr(str(sender or ''))
+    if name and addr:
+        return formataddr((name, addr))
+    return addr or str(sender or '')
+
+
+def _build_raw_email(sender, recipients, subject, body_html, domain):
+    """multipart/alternative (texto + HTML), un Message-ID y sin envoltorio mixed."""
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.utils import formatdate, make_msgid
+    html = body_html or ''
+    plain = _html_to_text(html) or ' '
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject or ''
+    msg['From'] = _format_from_header(sender)
+    msg['To'] = ', '.join(recipients)
+    msg['Date'] = formatdate(usegmt=True)
+    msg['Message-ID'] = make_msgid(domain=domain)
+    msg.attach(MIMEText(plain, 'plain', 'utf-8'))
+    msg.attach(MIMEText(html, 'html', 'utf-8'))
+    return msg.as_bytes()
 
 
 def send_html_email(app, mail, recipients, subject, body_html):
-    from flask_mail import Message as MailMessage
     if not recipients or not _mail_configured(app, mail):
         return False
     sender = app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME')
@@ -448,9 +476,7 @@ def send_html_email(app, mail, recipients, subject, body_html):
         or (from_addr.rsplit('@', 1)[-1] if '@' in from_addr else '')
         or 'localhost'
     )
-    msg = MailMessage(subject=subject, recipients=recipients, html=body_html, sender=sender)
-    raw = msg.as_bytes() if hasattr(msg, 'as_bytes') else msg.as_string().encode('utf-8')
-    raw = _force_message_id(raw, mail_domain)
+    raw = _build_raw_email(sender, recipients, subject, body_html, mail_domain)
     ehlo = mail_domain
     last_err = None
     for host, port, tls, ssl, user, password in _iter_smtp_targets(dict(app.config), public_url):

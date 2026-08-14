@@ -1295,8 +1295,7 @@ def admin_settings():
                 ok = send_html_email(
                     app, mail, [to],
                     f'Prueba SMTP — {academy}',
-                    f'<p>Si recibes este mensaje, el SMTP de <strong>{academy}</strong> funciona correctamente.</p>'
-                    f'<p>Servidor: {app.config.get("MAIL_SERVER")} · Puerto: {app.config.get("MAIL_PORT")}</p>',
+                    f'<p>Si recibes este mensaje, el correo de <strong>{academy}</strong> funciona correctamente.</p>',
                 )
                 if ok:
                     flash(f'Email de prueba enviado a {to}.', 'success')
