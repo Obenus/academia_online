@@ -1,8 +1,6 @@
 """Envío masivo de emails por tandas con registro."""
 import time
 
-from flask_mail import Message as MailMessage
-
 from models import db, EmailCampaign, User
 
 
@@ -11,8 +9,7 @@ BATCH_DELAY_SEC = 2
 
 
 def send_bulk_campaign(app, mail, admin_id, subject, body_html, target='students'):
-    from billing import apply_smtp_config, _mail_configured
-    apply_smtp_config(app, mail)
+    from billing import send_html_email, _mail_configured
     if not _mail_configured(app, mail):
         raise RuntimeError('SMTP no configurado')
 
@@ -38,9 +35,10 @@ def send_bulk_campaign(app, mail, admin_id, subject, body_html, target='students
                 failed += 1
                 continue
             try:
-                msg = MailMessage(subject=subject, recipients=[user.email], html=body_html)
-                mail.send(msg)
-                sent += 1
+                if send_html_email(app, mail, [user.email], subject, body_html):
+                    sent += 1
+                else:
+                    failed += 1
             except Exception as e:
                 print(f'[email_bulk] fail {user.email}: {e}')
                 failed += 1

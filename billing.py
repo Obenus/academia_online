@@ -131,104 +131,106 @@ def _smtp_tcp_ok(host, port, timeout=1.5):
         return False
 
 
-def _local_smtp_endpoint(preferred_port):
-    """Host local: relé en :2525 (red del host) o 587/465 si el firewall lo permite."""
+_LOOPBACK_SMTP = frozenset(('', 'localhost', '127.0.0.1', '::1', 'host.docker.internal'))
+
+
+def _is_loopback_smtp(server):
+    return (server or '').strip().lower() in _LOOPBACK_SMTP
+
+
+def _is_same_machine_smtp(server, public_base_url=''):
+    """True si el SMTP es este VPS (localhost o el mismo hostname que la web)."""
+    server = (server or '').strip()
+    low = server.lower()
+    if _is_loopback_smtp(low):
+        return True
+    pub = _public_hostname(public_base_url)
+    mail_host = low[4:] if low.startswith('www.') else low
+    if pub and (
+        mail_host == pub
+        or mail_host.endswith('.' + pub)
+        or pub.endswith('.' + mail_host)
+    ):
+        return True
+    try:
+        import socket
+        mail_ips = {ai[4][0] for ai in socket.getaddrinfo(server, None, socket.AF_INET)}
+        if mail_ips & {'127.0.0.1', '0.0.0.0'}:
+            return True
+    except OSError:
+        pass
+    return False
+
+
+def _host_smtp_endpoint(preferred_port):
+    """Desde Docker: SMTP del host, mismo puerto (sin quitar AUTH)."""
+    preferred_port = int(preferred_port or 587)
+    ports = []
+    for p in (preferred_port, 587, 465, 2525):
+        if p not in ports:
+            ports.append(p)
     for ip in _docker_host_ipv4_candidates():
-        if _smtp_tcp_ok(ip, 2525):
-            print(f'[mail] SMTP vía relé del host {ip}:2525')
-            return ip, 2525
-        for p in (preferred_port, 587, 465):
+        for p in ports:
             if _smtp_tcp_ok(ip, p):
-                print(f'[mail] SMTP del host alcanzable en {ip}:{p}')
+                print(f'[mail] SMTP del host en {ip}:{p}')
                 return ip, int(p)
-    print('[mail] SMTP local no responde; se usará 172.18.0.1:2525')
-    return '172.18.0.1', 2525
+    return _docker_host_ipv4_candidates()[0], preferred_port
 
 
-_EXTERNAL_SMTP = (
+_KNOWN_SMTP_PROVIDERS = (
     'gmail.com', 'google.com', 'outlook.com', 'office365.com',
     'sendgrid.net', 'mailgun.org', 'amazonaws.com', 'zoho.com',
 )
 
 
-def _is_external_smtp(server):
+def _is_known_smtp_provider(server):
     low = (server or '').strip().lower()
-    return any(part in low for part in _EXTERNAL_SMTP)
+    return any(part in low for part in _KNOWN_SMTP_PROVIDERS)
 
 
 def _smtp_host_for_docker(server, public_base_url='', port=587, local_relay=False):
-    """Reescribe a relé local: localhost, mismo dominio que la web, o casilla Plesk."""
+    """Solo reescribe si el SMTP es esta máquina; conserva puerto y credenciales."""
     server = (server or '').strip()
-    low = server.lower()
-    if _is_external_smtp(low):
+    if _is_known_smtp_provider(server):
         return server, port
-    use_host = local_relay or low in (
-        '', 'localhost', '127.0.0.1', '::1', 'host.docker.internal',
-    )
-    if not use_host:
-        pub = _public_hostname(public_base_url)
-        mail_host = low[4:] if low.startswith('www.') else low
-        if pub and (
-            mail_host == pub
-            or mail_host.endswith('.' + pub)
-            or pub.endswith('.' + mail_host)
-        ):
-            use_host = True
-        else:
-            try:
-                import socket
-                mail_ips = {ai[4][0] for ai in socket.getaddrinfo(server, None, socket.AF_INET)}
-                if mail_ips & {'127.0.0.1', '0.0.0.0'}:
-                    use_host = True
-            except OSError:
-                pass
-    if use_host:
-        return _local_smtp_endpoint(port)
+    if local_relay or _is_same_machine_smtp(server, public_base_url):
+        return _host_smtp_endpoint(port)
     return server, port
 
 
-def _local_unauth_cfg(cfg):
-    """Postfix en 127.0.0.1:25 acepta mynetworks; SASL en 587 falla con MX externo."""
-    if not cfg.get('MAIL_DEFAULT_SENDER'):
-        cfg['MAIL_DEFAULT_SENDER'] = cfg.get('MAIL_USERNAME') or ''
-    cfg['MAIL_USERNAME'] = ''
-    cfg['MAIL_PASSWORD'] = ''
-    cfg['MAIL_USE_TLS'] = False
-    cfg['MAIL_USE_SSL'] = False
-    return cfg
+def _tls_flags_for_port(port, use_tls=True, use_ssl=False):
+    port = int(port or 587)
+    if port == 465:
+        return False, True
+    if port in (25, 2525, 587):
+        if port == 25:
+            return False, False
+        return True, False
+    if use_ssl and use_tls:
+        use_tls = False
+    return bool(use_tls), bool(use_ssl)
 
 
 def _normalize_smtp_cfg(cfg, public_base_url=''):
-    """Docker no puede usar localhost/IP pública del mismo VPS; 465=SSL, 587=TLS."""
+    """Ajusta TLS/SSL por puerto y, en Docker, apunta al host si el SMTP es local."""
     try:
         port = int(cfg.get('MAIL_PORT') or 587)
     except (TypeError, ValueError):
         port = 587
-    cfg['MAIL_PORT'] = port
-    cfg['MAIL_USE_TLS'] = bool(cfg.get('MAIL_USE_TLS'))
-    cfg['MAIL_USE_SSL'] = bool(cfg.get('MAIL_USE_SSL'))
-    if port == 465:
-        cfg['MAIL_USE_SSL'] = True
-        cfg['MAIL_USE_TLS'] = False
-    elif port == 587:
-        cfg['MAIL_USE_SSL'] = False
-        cfg['MAIL_USE_TLS'] = True
-    if cfg['MAIL_USE_SSL'] and cfg['MAIL_USE_TLS']:
-        cfg['MAIL_USE_TLS'] = False
-    server = (cfg.get('MAIL_SERVER') or '').strip()
-    host, rport = _smtp_host_for_docker(
-        server, public_base_url, port, cfg.pop('_MAIL_LOCAL_RELAY', False),
+    tls, ssl = _tls_flags_for_port(
+        port, bool(cfg.get('MAIL_USE_TLS')), bool(cfg.get('MAIL_USE_SSL')),
     )
+    server = (cfg.get('MAIL_SERVER') or '').strip()
+    cfg['_MAIL_SERVER_ORIG'] = server
+    cfg['_MAIL_PORT_ORIG'] = port
+    host, rport = _smtp_host_for_docker(
+        server, public_base_url, port, bool(cfg.get('_MAIL_LOCAL_RELAY')),
+    )
+    tls, ssl = _tls_flags_for_port(rport, tls, ssl)
     cfg['MAIL_SERVER'] = host
     cfg['MAIL_PORT'] = int(rport)
-    if int(rport) == 2525:
-        _local_unauth_cfg(cfg)
-    elif int(rport) == 465:
-        cfg['MAIL_USE_SSL'] = True
-        cfg['MAIL_USE_TLS'] = False
-    elif int(rport) == 587:
-        cfg['MAIL_USE_SSL'] = False
-        cfg['MAIL_USE_TLS'] = True
+    cfg['MAIL_USE_TLS'] = tls
+    cfg['MAIL_USE_SSL'] = ssl
     return cfg
 
 
@@ -297,15 +299,126 @@ def render_template_vars(text, **kwargs):
     return text
 
 
-def _switch_to_local_unauth(app, mail):
-    alt_host, alt_port = _local_smtp_endpoint(app.config.get('MAIL_PORT') or 25)
-    print(f'[mail] SMTP local sin AUTH en {alt_host}:{alt_port}')
-    app.config['MAIL_SERVER'] = alt_host
-    app.config['MAIL_PORT'] = int(alt_port)
-    _local_unauth_cfg(app.config)
-    if mail is not None:
-        mail.init_app(app)
-    return alt_host, int(alt_port)
+def _sender_email(sender):
+    from email.utils import parseaddr
+    if isinstance(sender, (tuple, list)) and len(sender) >= 2:
+        return (sender[1] or '').strip()
+    return parseaddr(str(sender or ''))[1].strip()
+
+
+def _mx_hosts(domain):
+    hosts = []
+    try:
+        import dns.resolver
+        answers = dns.resolver.resolve(domain, 'MX')
+        hosts = [str(r.exchange).rstrip('.') for r in sorted(answers, key=lambda r: r.preference)]
+    except Exception as e:
+        print(f'[mail] MX {domain}: {e}')
+    return hosts or [domain]
+
+
+def _smtp_send_raw(host, port, use_tls, use_ssl, username, password, from_addr, recipients, raw, ehlo_name=''):
+    import smtplib
+    port = int(port)
+    kw = {'timeout': 12}
+    if ehlo_name:
+        kw['local_hostname'] = ehlo_name
+    if use_ssl:
+        smtp = smtplib.SMTP_SSL(host, port, **kw)
+    else:
+        smtp = smtplib.SMTP(host, port, **kw)
+    try:
+        smtp.ehlo()
+        if use_ssl:
+            pass
+        elif use_tls:
+            smtp.starttls()
+            smtp.ehlo()
+        elif smtp.has_extn('starttls'):
+            try:
+                smtp.starttls()
+                smtp.ehlo()
+            except Exception:
+                pass
+        if username and password:
+            smtp.login(username, password)
+        smtp.sendmail(from_addr, recipients, raw)
+    finally:
+        try:
+            smtp.quit()
+        except Exception:
+            try:
+                smtp.close()
+            except Exception:
+                pass
+
+
+def _iter_smtp_targets(cfg, public_base_url=''):
+    """Destinos a probar con las mismas credenciales (sin quitar AUTH)."""
+    orig = (cfg.get('_MAIL_SERVER_ORIG') or cfg.get('MAIL_SERVER') or '').strip()
+    try:
+        orig_port = int(cfg.get('_MAIL_PORT_ORIG') or cfg.get('MAIL_PORT') or 587)
+    except (TypeError, ValueError):
+        orig_port = 587
+    user = (cfg.get('MAIL_USERNAME') or '').strip()
+    password = cfg.get('MAIL_PASSWORD') or ''
+    use_tls = bool(cfg.get('MAIL_USE_TLS'))
+    use_ssl = bool(cfg.get('MAIL_USE_SSL'))
+    local_relay = bool(cfg.get('_MAIL_LOCAL_RELAY'))
+    seen = set()
+    targets = []
+
+    def add(host, p, tls=None, ssl=None):
+        if not host:
+            return
+        p = int(p)
+        t, s = _tls_flags_for_port(
+            p, use_tls if tls is None else tls, use_ssl if ssl is None else ssl,
+        )
+        key = (str(host), p, t, s)
+        if key in seen:
+            return
+        seen.add(key)
+        targets.append((str(host), p, t, s, user, password))
+
+    same = (
+        not _is_known_smtp_provider(orig)
+        and (local_relay or _is_same_machine_smtp(orig, public_base_url))
+    )
+    if orig and not _is_loopback_smtp(orig) and not same:
+        add(orig, orig_port, use_tls, use_ssl)
+    if same:
+        for ip in _docker_host_ipv4_candidates()[:2]:
+            add(ip, orig_port)
+            if orig_port not in (587, 2525):
+                add(ip, 587, True, False)
+            add(ip, 2525, True, False)
+    return targets
+
+
+def _deliver_via_mx(from_addr, recipients, raw, ehlo_name=''):
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for rcpt in recipients:
+        domain = (rcpt.rsplit('@', 1)[-1] if '@' in rcpt else '').strip().lower()
+        if domain:
+            groups[domain].append(rcpt)
+    if not groups:
+        raise RuntimeError('Destinatarios sin dominio')
+    last_err = None
+    for domain, addrs in groups.items():
+        delivered = False
+        for mx in _mx_hosts(domain):
+            try:
+                print(f'[mail] entrega directa MX {mx}:25 → {addrs}')
+                _smtp_send_raw(mx, 25, False, False, '', '', from_addr, addrs, raw, ehlo_name)
+                delivered = True
+                break
+            except Exception as e:
+                last_err = e
+                print(f'[mail] MX {mx} falló: {e}')
+        if not delivered:
+            raise last_err or RuntimeError(f'Sin entrega MX a {domain}')
 
 
 def send_html_email(app, mail, recipients, subject, body_html):
@@ -313,22 +426,37 @@ def send_html_email(app, mail, recipients, subject, body_html):
     if not recipients or not _mail_configured(app, mail):
         return False
     sender = app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME')
+    from_addr = _sender_email(sender)
+    if not from_addr:
+        return False
     msg = MailMessage(subject=subject, recipients=recipients, html=body_html, sender=sender)
+    raw = msg.as_bytes() if hasattr(msg, 'as_bytes') else msg.as_string().encode('utf-8')
+    ehlo = _public_hostname(app.config.get('PUBLIC_BASE_URL') or '') or from_addr.rsplit('@', 1)[-1]
+    last_err = None
+    public_url = app.config.get('PUBLIC_BASE_URL') or ''
+    for host, port, tls, ssl, user, password in _iter_smtp_targets(dict(app.config), public_url):
+        try:
+            print(f'[mail] intento SMTP {host}:{port}')
+            _smtp_send_raw(host, port, tls, ssl, user, password, from_addr, recipients, raw, ehlo)
+            print(f'[mail] enviado por {host}:{port}')
+            return True
+        except Exception as e:
+            last_err = e
+            print(f'[mail] {host}:{port} → {e}')
+            err = str(e).lower()
+            if '535' in err or '454' in err or 'relay access denied' in err or 'authentication' in err:
+                print('[mail] el SMTP no puede reenviar; se prueba entrega directa (MX)')
+                break
     try:
-        mail.send(msg)
+        _deliver_via_mx(from_addr, recipients, raw, ehlo)
+        print('[mail] enviado por entrega directa (MX)')
         return True
     except Exception as e:
-        err = str(e)
-        orig = (app.config.get('MAIL_SERVER') or '')
-        if _is_external_smtp(orig):
-            raise
-        refused = getattr(e, 'errno', None) == 111 or 'Connection refused' in err
-        auth_fail = '535' in err or 'authentication' in err.lower()
-        if not (refused or auth_fail):
-            raise
-        _switch_to_local_unauth(app, mail)
-        mail.send(msg)
-        return True
+        last_err = e
+        print(f'[mail] entrega MX falló: {e}')
+    if last_err:
+        raise last_err
+    return False
 
 
 def default_welcome_subject():

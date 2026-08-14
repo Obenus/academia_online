@@ -1307,12 +1307,13 @@ def admin_settings():
                 port = app.config.get('MAIL_PORT')
                 hint = ''
                 err = str(e)
-                if '535' in err or 'authentication' in err.lower():
+                if '454' in err or 'Relay access denied' in err:
                     hint = (
-                        ' Postfix rechazó SASL. En Plesk local no hace falta contraseña: '
-                        'marca «SMTP de este servidor», usuario = remitente (noreply@…) '
-                        'y deja la contraseña vacía.'
+                        ' El SMTP no reenvía a ese destinatario. Usa un SMTP con usuario y contraseña '
+                        'válidos, o deja salida al puerto 25 para entrega directa (SPF de la IP del VPS).'
                     )
+                elif '535' in err or 'authentication' in err.lower():
+                    hint = ' Usuario o contraseña rechazados por el servidor SMTP.'
                 flash(f'Error SMTP ({host}:{port}): {e}.{hint}', 'error')
         return redirect(url_for('admin_settings') + '#smtp')
     if request.method == 'POST':
