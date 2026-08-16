@@ -15,10 +15,15 @@
 
 <div class="rounded-xl p-6 shadow-sm" style="background:var(--surface);border:1px solid var(--border)">
   <form method="POST" class="space-y-5">
+    {% include 'includes/csrf_field.html' %}
     <div>
       <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Nombre / titular (cabecera)</label>
       <input type="text" name="landing_title" class="input" value="{{ s.landing_title or defaults.landing_title }}"/>
     </div>
+
+    {% with name='landing_video_after_title', label='Vídeo tras el título / cabecera', value=s.landing_video_after_title %}
+    {% include 'admin/_landing_video_field.html' %}
+    {% endwith %}
 
     <div>
       <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Apertura — preguntas y «No estás perdida»</label>
@@ -26,47 +31,73 @@
       <p class="text-[11px] mt-1" style="color:var(--text4)">Párrafos separados por una línea en blanco.</p>
     </div>
 
+    {% with name='landing_video_after_hook', label='Vídeo tras la apertura', value=s.landing_video_after_hook %}
+    {% include 'admin/_landing_video_field.html' %}
+    {% endwith %}
+
     <div>
       <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Por qué nació (mejores preguntas)</label>
       <textarea name="landing_intro" class="input" rows="6">{{ s.landing_intro or defaults.landing_intro }}</textarea>
     </div>
 
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Vídeo (YouTube o Vimeo) — entre «Por qué nació» y «¿Qué es?»</label>
-      <input type="url" name="landing_video_url" class="input" value="{{ s.landing_video_url or '' }}" placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…"/>
-      <p class="text-[11px] mt-1" style="color:var(--text4)">Si está vacío, la sección no se muestra en la landing.</p>
-    </div>
+    {% with name='landing_video_url', label='Vídeo tras «Por qué nació» (entre intro y ¿Qué es?)', value=s.landing_video_url %}
+    {% include 'admin/_landing_video_field.html' %}
+    {% endwith %}
 
     <div>
       <label class="block text-xs font-medium mb-1" style="color:var(--text3)">¿Qué es? (no es terapia, es un círculo…)</label>
       <textarea name="landing_what_is" class="input" rows="8">{{ s.landing_what_is or defaults.landing_what_is }}</textarea>
     </div>
 
+    {% with name='landing_video_after_what_is', label='Vídeo tras «¿Qué es?»', value=s.landing_video_after_what_is %}
+    {% include 'admin/_landing_video_field.html' %}
+    {% endwith %}
+
     <div>
       <label class="block text-xs font-medium mb-1" style="color:var(--text3)">¿Cómo puede ayudarte?</label>
       <textarea name="landing_how_helps" class="input" rows="7">{{ s.landing_how_helps or defaults.landing_how_helps }}</textarea>
     </div>
+
+    {% with name='landing_video_after_how_helps', label='Vídeo tras «¿Cómo puede ayudarte?»', value=s.landing_video_after_how_helps %}
+    {% include 'admin/_landing_video_field.html' %}
+    {% endwith %}
 
     <div>
       <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Preguntas que exploraremos (una por línea)</label>
       <textarea name="landing_explore_questions" class="input" rows="7">{{ s.landing_explore_questions or defaults.landing_explore_questions }}</textarea>
     </div>
 
+    {% with name='landing_video_after_explore', label='Vídeo tras «Preguntas que exploraremos»', value=s.landing_video_after_explore %}
+    {% include 'admin/_landing_video_field.html' %}
+    {% endwith %}
+
     <div>
       <label class="block text-xs font-medium mb-1" style="color:var(--text3)">¿Qué encontrarás dentro? (una por línea)</label>
       <textarea name="landing_includes" class="input" rows="7">{{ s.landing_includes or defaults.landing_includes }}</textarea>
     </div>
+
+    {% with name='landing_video_after_includes', label='Vídeo tras «¿Qué encontrarás dentro?»', value=s.landing_video_after_includes %}
+    {% include 'admin/_landing_video_field.html' %}
+    {% endwith %}
 
     <div>
       <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Este círculo es para ti si… (una por línea)</label>
       <textarea name="landing_for_you" class="input" rows="7">{{ s.landing_for_you or defaults.landing_for_you }}</textarea>
     </div>
 
+    {% with name='landing_video_after_for_you', label='Vídeo tras «Este círculo es para ti si…»', value=s.landing_video_after_for_you %}
+    {% include 'admin/_landing_video_field.html' %}
+    {% endwith %}
+
     <div>
       <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Cierre emocional</label>
       <textarea name="landing_closing" class="input" rows="5">{{ s.landing_closing or defaults.landing_closing }}</textarea>
       <p class="text-[11px] mt-1" style="color:var(--text4)">Dos bloques separados por línea en blanco: mensaje + «Tu ratito…»</p>
     </div>
+
+    {% with name='landing_video_after_closing', label='Vídeo tras el cierre emocional', value=s.landing_video_after_closing %}
+    {% include 'admin/_landing_video_field.html' %}
+    {% endwith %}
 
     <div class="grid sm:grid-cols-2 gap-4">
       <div>

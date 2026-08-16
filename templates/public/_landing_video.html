@@ -1,0 +1,15 @@
+{% set _vid = (url or '')|trim %}
+{% if _vid %}
+{% set embed = _vid|video_embed_public %}
+{% if embed %}
+<section class="conv-section">
+  <div class="relative w-full overflow-hidden rounded-2xl bg-black" style="padding-bottom:56.25%">
+    <iframe src="{{ embed }}" title="Vídeo"
+      class="absolute inset-0 w-full h-full border-0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen loading="lazy"
+      referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  </div>
+</section>
+{% endif %}
+{% endif %}

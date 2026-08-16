@@ -28,7 +28,7 @@ from geo_utils import detect_billing_region, billing_region_label
 from n8n_notify import notify_n8n_pregunta
 from registration import create_user_from_checkout
 from landing_content import (
-    LANDING_DEFAULTS, LANDING_FORM_FIELDS,
+    LANDING_DEFAULTS, LANDING_FORM_FIELDS, LANDING_VIDEO_FIELDS,
     landing_text, landing_paragraphs, landing_lines,
 )
 from spain_provinces import (
@@ -1415,6 +1415,7 @@ def admin_landing():
         return redirect(url_for('admin_landing'))
     return render_template(
         'admin/landing.html', s=s, defaults=LANDING_DEFAULTS, fields=LANDING_FORM_FIELDS,
+        video_fields=LANDING_VIDEO_FIELDS,
     )
 
 
@@ -4829,6 +4830,14 @@ else:
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_title VARCHAR(200) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_subtitle VARCHAR(300) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_url VARCHAR(500) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_after_title VARCHAR(500) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_after_hook VARCHAR(500) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_after_what_is VARCHAR(500) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_after_how_helps VARCHAR(500) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_after_explore VARCHAR(500) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_after_includes VARCHAR(500) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_after_for_you VARCHAR(500) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_after_closing VARCHAR(500) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_community_md TEXT DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_privacy_md TEXT DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS legal_cookies_md TEXT DEFAULT ''"))

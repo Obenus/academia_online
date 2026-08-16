@@ -96,12 +96,28 @@ Un lugar donde volver a ti.''',
     'landing_login_subtitle': 'Accede con tu email y contraseña',
 }
 
+# Vídeos opcionales entre bloques de texto (el de tras intro es landing_video_url, ya existente).
+LANDING_VIDEO_FIELDS = [
+    ('landing_video_after_title', 'Vídeo tras el título / cabecera'),
+    ('landing_video_after_hook', 'Vídeo tras la apertura'),
+    ('landing_video_url', 'Vídeo tras «Por qué nació» (entre intro y ¿Qué es?)'),
+    ('landing_video_after_what_is', 'Vídeo tras «¿Qué es?»'),
+    ('landing_video_after_how_helps', 'Vídeo tras «¿Cómo puede ayudarte?»'),
+    ('landing_video_after_explore', 'Vídeo tras «Preguntas que exploraremos»'),
+    ('landing_video_after_includes', 'Vídeo tras «¿Qué encontrarás dentro?»'),
+    ('landing_video_after_for_you', 'Vídeo tras «Este círculo es para ti si…»'),
+    ('landing_video_after_closing', 'Vídeo tras el cierre emocional'),
+]
 
 LANDING_FORM_FIELDS = [
     'landing_title', 'landing_hook', 'landing_intro', 'landing_video_url', 'landing_what_is',
     'landing_how_helps', 'landing_explore_questions', 'landing_includes',
     'landing_for_you', 'landing_closing', 'landing_cta_text', 'landing_price_note',
     'landing_login_title', 'landing_login_subtitle',
+    'landing_video_after_title', 'landing_video_after_hook',
+    'landing_video_after_what_is', 'landing_video_after_how_helps',
+    'landing_video_after_explore', 'landing_video_after_includes',
+    'landing_video_after_for_you', 'landing_video_after_closing',
 ]
 
 

@@ -75,6 +75,7 @@
     <article>
       <section class="conv-section">
         <h1 class="conv-hero mb-6">{{ landing_text(site, 'landing_title') }}</h1>
+        {% with url=site.landing_video_after_title %}{% include 'public/_landing_video.html' %}{% endwith %}
         <div class="conv-prose">
           {% for p in landing_paragraphs(site, 'landing_hook') %}
           <p class="{% if loop.index <= 4 %}lead{% endif %}">{{ p }}</p>
@@ -82,27 +83,15 @@
         </div>
       </section>
 
+      {% with url=site.landing_video_after_hook %}{% include 'public/_landing_video.html' %}{% endwith %}
+
       <section class="conv-section conv-prose">
         {% for p in landing_paragraphs(site, 'landing_intro') %}
         <p>{{ p }}</p>
         {% endfor %}
       </section>
 
-      {% set landing_vid = site.landing_video_url or '' %}
-      {% if landing_vid.strip() %}
-      {% set embed = landing_vid|video_embed_public %}
-      {% if embed %}
-      <section class="conv-section">
-        <div class="relative w-full overflow-hidden rounded-2xl bg-black" style="padding-bottom:56.25%">
-          <iframe src="{{ embed }}" title="Vídeo"
-            class="absolute inset-0 w-full h-full border-0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen loading="lazy"
-            referrerpolicy="strict-origin-when-cross-origin"></iframe>
-        </div>
-      </section>
-      {% endif %}
-      {% endif %}
+      {% with url=site.landing_video_url %}{% include 'public/_landing_video.html' %}{% endwith %}
 
       <section class="conv-section">
         <h2>¿Qué es {{ landing_text(site, 'landing_title') }}?</h2>
@@ -112,6 +101,8 @@
           {% endfor %}
         </div>
       </section>
+
+      {% with url=site.landing_video_after_what_is %}{% include 'public/_landing_video.html' %}{% endwith %}
 
       <div class="lg:hidden conv-section" id="planes-mobile">
         {% include 'public/_landing_checkout.html' %}
@@ -126,6 +117,8 @@
         </div>
       </section>
 
+      {% with url=site.landing_video_after_how_helps %}{% include 'public/_landing_video.html' %}{% endwith %}
+
       <section class="conv-section">
         <h2>Algunas de las preguntas que exploraremos juntas</h2>
         <ul class="conv-list">
@@ -135,6 +128,8 @@
         </ul>
       </section>
 
+      {% with url=site.landing_video_after_explore %}{% include 'public/_landing_video.html' %}{% endwith %}
+
       <section class="conv-section">
         <h2>¿Qué encontrarás dentro?</h2>
         <ul class="conv-list">
@@ -143,6 +138,8 @@
           {% endfor %}
         </ul>
       </section>
+
+      {% with url=site.landing_video_after_includes %}{% include 'public/_landing_video.html' %}{% endwith %}
 
       <section class="conv-section conv-prose">
         {% set closing_parts = landing_paragraphs(site, 'landing_closing') %}
@@ -162,6 +159,8 @@
         </ul>
       </section>
 
+      {% with url=site.landing_video_after_for_you %}{% include 'public/_landing_video.html' %}{% endwith %}
+
       <section class="conv-section conv-closing">
         {% if closing_parts|length > 1 %}
         {% for line in closing_parts[1].split('\n') %}
@@ -169,6 +168,8 @@
         {% endfor %}
         {% endif %}
       </section>
+
+      {% with url=site.landing_video_after_closing %}{% include 'public/_landing_video.html' %}{% endwith %}
     </article>
 
     <aside class="conv-sidebar space-y-5 hidden lg:block">
