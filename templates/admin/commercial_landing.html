@@ -36,8 +36,17 @@
       <input type="text" name="commercial_landing_title" class="input" value="{{ s.commercial_landing_title or defaults.commercial_landing_title }}"/>
     </div>
     <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto (Markdown)</label>
-      <textarea name="commercial_landing_text" class="input font-mono text-sm" rows="8">{{ s.commercial_landing_text or defaults.commercial_landing_text }}</textarea>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto superior (Markdown)</label>
+      <textarea name="commercial_landing_text" class="input font-mono text-sm" rows="6">{{ s.commercial_landing_text or defaults.commercial_landing_text }}</textarea>
+    </div>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Vídeo (YouTube o Vimeo)</label>
+      <input type="url" name="commercial_landing_video_url" class="input" value="{{ s.commercial_landing_video_url or '' }}" placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…"/>
+      <p class="text-[11px] mt-1" style="color:var(--text4)">Opcional. Si lo dejas vacío, no aparece en la página pública.</p>
+    </div>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto inferior (Markdown)</label>
+      <textarea name="commercial_landing_text_after" class="input font-mono text-sm" rows="6">{{ s.commercial_landing_text_after if s.commercial_landing_text_after is not none else defaults.commercial_landing_text_after }}</textarea>
     </div>
     <div>
       <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Enlace WhatsApp (botón de la página)</label>
@@ -57,12 +66,13 @@
       <input type="email" name="commercial_lead_notify_email" class="input" value="{{ s.commercial_lead_notify_email or '' }}" placeholder="admin@ejemplo.com"/>
     </div>
     <h2 class="text-sm font-bold" style="color:var(--text1)">Autorespuesta al visitante</h2>
-    <p class="text-[11px]" style="color:var(--text4)">Variables: {% raw %}<code>{{nombre}}</code>, <code>{{email}}</code>, <code>{{whatsapp_url}}</code>, <code>{{academy_name}}</code>{% endraw %}</p>
+    <p class="text-[11px]" style="color:var(--text4)">Variables: {% raw %}<code>{{nombre}}</code>, <code>{{email}}</code>, <code>{{whatsapp_url}}</code>, <code>{{academy_name}}</code>{% endraw %}. Si el enlace de respuesta está vacío, se usa el de la página.</p>
     <input type="text" name="commercial_reply_subject" class="input" value="{{ s.commercial_reply_subject or defaults.commercial_reply_subject }}" placeholder="Asunto"/>
     <textarea name="commercial_reply_body" class="input" rows="7">{{ s.commercial_reply_body or defaults.commercial_reply_body }}</textarea>
     <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Enlace WhatsApp del email de respuesta (distinto del botón de la página)</label>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Enlace WhatsApp del email de respuesta</label>
       <input type="url" name="commercial_reply_whatsapp_url" class="input" value="{{ s.commercial_reply_whatsapp_url or '' }}" placeholder="https://chat.whatsapp.com/..."/>
+      <p class="text-[11px] mt-1" style="color:var(--text4)">Vacío = se usa el mismo enlace WhatsApp de la página. Debe empezar por https://</p>
     </div>
     <button type="submit" class="btn btn-primary">Guardar landing comercial</button>
   </form>

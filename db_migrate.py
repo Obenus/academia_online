@@ -162,6 +162,8 @@ def run_migrations(conn):
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_slug VARCHAR(80) DEFAULT 'oferta'",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_title VARCHAR(200) DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_text TEXT DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_text_after TEXT DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_video_url VARCHAR(500) DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_whatsapp_url VARCHAR(500) DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_image_data BYTEA",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_image_mime VARCHAR(50) DEFAULT 'image/jpeg'",

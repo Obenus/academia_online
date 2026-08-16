@@ -44,6 +44,20 @@
   <div class="prose mb-6">{{ text_html }}</div>
   {% endif %}
 
+  {% if video_embed %}
+  <div class="mb-6 relative w-full overflow-hidden rounded-2xl bg-black" style="padding-bottom:56.25%">
+    <iframe src="{{ video_embed }}" title="Vídeo"
+      class="absolute inset-0 w-full h-full border-0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen loading="lazy"
+      referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  </div>
+  {% endif %}
+
+  {% if text_after_html %}
+  <div class="prose mb-6">{{ text_after_html }}</div>
+  {% endif %}
+
   {% if s.commercial_landing_whatsapp_url %}
   <a href="{{ s.commercial_landing_whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-wa">Abrir canal de WhatsApp</a>
   {% endif %}

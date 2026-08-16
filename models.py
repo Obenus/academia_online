@@ -319,6 +319,8 @@ class SiteSettings(db.Model):
     commercial_landing_slug      = db.Column(db.String(80), default='oferta')
     commercial_landing_title     = db.Column(db.String(200), default='')
     commercial_landing_text      = db.Column(db.Text, default='')
+    commercial_landing_text_after = db.Column(db.Text, default='')
+    commercial_landing_video_url = db.Column(db.String(500), default='')
     commercial_landing_whatsapp_url = db.Column(db.String(500), default='')
     commercial_landing_image_data = db.Column(db.LargeBinary, nullable=True)
     commercial_landing_image_mime = db.Column(db.String(50), default='image/jpeg')

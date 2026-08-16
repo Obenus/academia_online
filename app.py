@@ -46,7 +46,7 @@ from blueprints.library import bp as library_bp
 from blueprints.resources import bp as resources_bp
 from video_utils import video_thumbnail_url, video_embed_url, video_embed_url_public
 from markdown_utils import render_markdown
-from commercial_content import COMMERCIAL_DEFAULTS, normalize_slug
+from commercial_content import COMMERCIAL_DEFAULTS, normalize_slug, normalize_https_url
 from backup_manager import run_backup, encrypt_value, decrypt_value, list_local_backups, restore_backup
 from billing import (
     payments_enabled, get_stripe_secret, get_stripe_public, get_stripe_webhook_secret,
@@ -1459,11 +1459,17 @@ def admin_commercial_landing():
         s.commercial_landing_slug = normalize_slug(request.form.get('commercial_landing_slug'), 'oferta')
         s.commercial_landing_title = request.form.get('commercial_landing_title', '').strip()
         s.commercial_landing_text = request.form.get('commercial_landing_text', '')
-        s.commercial_landing_whatsapp_url = request.form.get('commercial_landing_whatsapp_url', '').strip()
+        s.commercial_landing_text_after = request.form.get('commercial_landing_text_after', '')
+        s.commercial_landing_video_url = request.form.get('commercial_landing_video_url', '').strip()
+        s.commercial_landing_whatsapp_url = normalize_https_url(
+            request.form.get('commercial_landing_whatsapp_url', '')
+        )
         s.commercial_lead_notify_email = request.form.get('commercial_lead_notify_email', '').strip().lower()
         s.commercial_reply_subject = request.form.get('commercial_reply_subject', '').strip()
         s.commercial_reply_body = request.form.get('commercial_reply_body', '')
-        s.commercial_reply_whatsapp_url = request.form.get('commercial_reply_whatsapp_url', '').strip()
+        s.commercial_reply_whatsapp_url = normalize_https_url(
+            request.form.get('commercial_reply_whatsapp_url', '')
+        )
         img = request.files.get('commercial_landing_image')
         if img and img.filename:
             try:
@@ -1564,7 +1570,11 @@ def _render_commercial_landing():
     s = get_settings()
     if not s.commercial_landing_enabled:
         abort(404)
-    text = (s.commercial_landing_text or '').strip() or COMMERCIAL_DEFAULTS['commercial_landing_text']
+    text_before = (s.commercial_landing_text or '').strip()
+    if not text_before:
+        text_before = COMMERCIAL_DEFAULTS['commercial_landing_text']
+    text_after = (s.commercial_landing_text_after or '').strip()
+    video_url = (s.commercial_landing_video_url or '').strip()
     if request.method == 'POST':
         # honeypot
         if request.form.get('website'):
@@ -1581,18 +1591,28 @@ def _render_commercial_landing():
         db.session.commit()
 
         academy = s.academy_name or app.config.get('ACADEMY_NAME', 'Academia')
-        reply_wa = (s.commercial_reply_whatsapp_url or '').strip()
+        reply_wa = normalize_https_url(
+            (s.commercial_reply_whatsapp_url or '').strip()
+            or (s.commercial_landing_whatsapp_url or '').strip()
+        )
         subject_tpl = (s.commercial_reply_subject or '').strip() or COMMERCIAL_DEFAULTS['commercial_reply_subject']
         body_tpl = (s.commercial_reply_body or '').strip() or COMMERCIAL_DEFAULTS['commercial_reply_body']
+        if not reply_wa:
+            body_tpl = (
+                '<p>Hola <strong>{{nombre}}</strong>,</p>'
+                '<p>Gracias por tu interés en <strong>{{academy_name}}</strong>. '
+                'Pronto te contactaremos con más información.</p>'
+            )
         ctx = {
             'nombre': name,
             'email': email,
-            'whatsapp_url': reply_wa or '#',
+            'whatsapp_url': reply_wa,
             'academy_name': academy,
         }
         try:
             subject = render_template_vars(subject_tpl, **ctx)
             inner = render_template_vars(body_tpl, **ctx)
+            print(f'[commercial] reply WhatsApp URL: {reply_wa or "(vacío)"}')
             send_html_email(app, mail, [email], subject, email_wrapper(academy, inner))
         except Exception as e:
             print(f'[commercial] reply email: {e}')
@@ -1619,7 +1639,9 @@ def _render_commercial_landing():
     return render_template(
         'public/commercial_landing.html',
         s=s,
-        text_html=render_markdown(text),
+        text_html=render_markdown(text_before),
+        text_after_html=render_markdown(text_after) if text_after else '',
+        video_embed=video_embed_url_public(video_url) if video_url else '',
     )
 
 
@@ -4815,6 +4837,8 @@ else:
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_slug VARCHAR(80) DEFAULT 'oferta'"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_title VARCHAR(200) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_text TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_text_after TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_video_url VARCHAR(500) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_whatsapp_url VARCHAR(500) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_image_data BYTEA"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_landing_image_mime VARCHAR(50) DEFAULT 'image/jpeg'"))
