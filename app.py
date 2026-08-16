@@ -61,6 +61,7 @@ from billing import (
 app = Flask(__name__)
 app.config.from_pyfile('config.py')
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 604800  # 7 días de caché para estáticos
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 # Pool BD conservador: 3 workers × 3 pool = 9 conexiones máx (Railway free tier = 10 conn limit)
 app.config.setdefault('SQLALCHEMY_POOL_SIZE', 3)
 app.config.setdefault('SQLALCHEMY_MAX_OVERFLOW', 2)

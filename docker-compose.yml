@@ -29,6 +29,7 @@ services:
     volumes:
       - ./secrets:/run/secrets:ro
       - ./backups:/app/backups
+      - ./templates:/app/templates:ro
     depends_on:
       db:
         condition: service_healthy
