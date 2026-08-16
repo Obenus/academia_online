@@ -66,7 +66,11 @@
       <input type="email" name="commercial_lead_notify_email" class="input" value="{{ s.commercial_lead_notify_email or '' }}" placeholder="admin@ejemplo.com"/>
     </div>
     <h2 class="text-sm font-bold" style="color:var(--text1)">Autorespuesta al visitante</h2>
-    <p class="text-[11px]" style="color:var(--text4)">Variables: {% raw %}<code>{{nombre}}</code>, <code>{{email}}</code>, <code>{{whatsapp_url}}</code>, <code>{{academy_name}}</code>{% endraw %}. Si el enlace de respuesta está vacío, se usa el de la página.</p>
+    <p class="text-[11px]" style="color:var(--text4)">
+      Variables: {% raw %}<code>{{nombre}}</code>, <code>{{email}}</code>, <code>{{whatsapp_url}}</code>, <code>{{academy_name}}</code>{% endraw %}.
+      En el botón usa exactamente <code>{% raw %}{{whatsapp_url}}{% endraw %}</code> (no pegues la URL entre llaves).
+      Si el enlace de respuesta está vacío, se usa el de la página.
+    </p>
     <input type="text" name="commercial_reply_subject" class="input" value="{{ s.commercial_reply_subject or defaults.commercial_reply_subject }}" placeholder="Asunto"/>
     <textarea name="commercial_reply_body" class="input" rows="7">{{ s.commercial_reply_body or defaults.commercial_reply_body }}</textarea>
     <div>

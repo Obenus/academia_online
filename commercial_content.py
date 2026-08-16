@@ -20,11 +20,40 @@ def normalize_https_url(raw):
     url = (raw or '').strip()
     if not url or url == '#':
         return ''
+    # Quita {{ }} si alguien pegó la URL como «variable»
+    if url.startswith('{{') and url.endswith('}}'):
+        url = url[2:-2].strip()
+    if not url or url == '#':
+        return ''
     if url.startswith(('http://', 'https://')):
         return url
     if url.startswith('//'):
         return 'https:' + url
     return 'https://' + url
+
+
+def unwrap_braced_urls(text):
+    """Convierte {{https://...}} en https://... (error frecuente al editar plantillas)."""
+    return re.sub(r'\{\{\s*(https?://[^}\s]+)\s*\}\}', r'\1', text or '')
+
+
+def sanitize_commercial_reply_body(body, whatsapp_url=''):
+    """Deja {{whatsapp_url}} donde haya una URL entre llaves; opcionalmente rellena whatsapp_url."""
+    body = body or ''
+    found = ''
+
+    def _repl(m):
+        nonlocal found
+        url = normalize_https_url(m.group(1))
+        if url and not found:
+            found = url
+        return '{{whatsapp_url}}'
+
+    body = re.sub(r'\{\{\s*(https?://[^}]+)\s*\}\}', _repl, body)
+    body = unwrap_braced_urls(body)
+    wa = normalize_https_url(whatsapp_url) or found
+    return body, wa
+
 
 RESERVED_SLUGS = frozenset({
     'login', 'logout', 'registro', 'admin', 'comunidad', 'cursos', 'formaciones',

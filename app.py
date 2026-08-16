@@ -46,7 +46,9 @@ from blueprints.library import bp as library_bp
 from blueprints.resources import bp as resources_bp
 from video_utils import video_thumbnail_url, video_embed_url, video_embed_url_public
 from markdown_utils import render_markdown
-from commercial_content import COMMERCIAL_DEFAULTS, normalize_slug, normalize_https_url
+from commercial_content import (
+    COMMERCIAL_DEFAULTS, normalize_slug, normalize_https_url, sanitize_commercial_reply_body,
+)
 from backup_manager import run_backup, encrypt_value, decrypt_value, list_local_backups, restore_backup
 from billing import (
     payments_enabled, get_stripe_secret, get_stripe_public, get_stripe_webhook_secret,
@@ -1468,10 +1470,11 @@ def admin_commercial_landing():
         )
         s.commercial_lead_notify_email = request.form.get('commercial_lead_notify_email', '').strip().lower()
         s.commercial_reply_subject = request.form.get('commercial_reply_subject', '').strip()
-        s.commercial_reply_body = request.form.get('commercial_reply_body', '')
-        s.commercial_reply_whatsapp_url = normalize_https_url(
-            request.form.get('commercial_reply_whatsapp_url', '')
-        )
+        body_raw = request.form.get('commercial_reply_body', '')
+        wa_raw = request.form.get('commercial_reply_whatsapp_url', '')
+        body_clean, wa_clean = sanitize_commercial_reply_body(body_raw, wa_raw)
+        s.commercial_reply_body = body_clean
+        s.commercial_reply_whatsapp_url = wa_clean or normalize_https_url(wa_raw)
         img = request.files.get('commercial_landing_image')
         if img and img.filename:
             try:
@@ -1593,12 +1596,14 @@ def _render_commercial_landing():
         db.session.commit()
 
         academy = s.academy_name or app.config.get('ACADEMY_NAME', 'Academia')
-        reply_wa = normalize_https_url(
-            (s.commercial_reply_whatsapp_url or '').strip()
-            or (s.commercial_landing_whatsapp_url or '').strip()
-        )
-        subject_tpl = (s.commercial_reply_subject or '').strip() or COMMERCIAL_DEFAULTS['commercial_reply_subject']
         body_tpl = (s.commercial_reply_body or '').strip() or COMMERCIAL_DEFAULTS['commercial_reply_body']
+        body_tpl, extracted_wa = sanitize_commercial_reply_body(
+            body_tpl,
+            (s.commercial_reply_whatsapp_url or '').strip()
+            or (s.commercial_landing_whatsapp_url or '').strip(),
+        )
+        reply_wa = normalize_https_url(extracted_wa)
+        subject_tpl = (s.commercial_reply_subject or '').strip() or COMMERCIAL_DEFAULTS['commercial_reply_subject']
         if not reply_wa:
             body_tpl = (
                 '<p>Hola <strong>{{nombre}}</strong>,</p>'

@@ -293,9 +293,12 @@ def _mail_configured(app, mail=None):
 
 
 def render_template_vars(text, **kwargs):
+    import re
     for key, val in kwargs.items():
         text = text.replace('{{' + key + '}}', str(val or ''))
         text = text.replace('{{ ' + key + ' }}', str(val or ''))
+    # Si pegaron la URL dentro de {{ }}, quitar las llaves (href inválido en emails)
+    text = re.sub(r'\{\{\s*(https?://[^}\s]+)\s*\}\}', r'\1', text or '')
     return text
 
 
