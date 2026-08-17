@@ -1,0 +1,11 @@
+[Unit]
+Description=Academia: cada 30s comprueba que 8080 responde
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

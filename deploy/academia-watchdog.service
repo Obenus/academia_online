@@ -1,0 +1,9 @@
+[Unit]
+Description=Academia: comprueba el puerto 8080 del host
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/academia_online
+ExecStart=/opt/academia_online/watchdog_host.sh
