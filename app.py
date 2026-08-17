@@ -65,12 +65,12 @@ app.config.from_pyfile('config.py')
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 604800  # 7 días de caché para estáticos
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 # Pool BD conservador: 3 workers × 3 pool = 9 conexiones máx (Railway free tier = 10 conn limit)
-app.config.setdefault('SQLALCHEMY_POOL_SIZE', 3)
-app.config.setdefault('SQLALCHEMY_MAX_OVERFLOW', 2)
+app.config.setdefault('SQLALCHEMY_POOL_SIZE', 5)
+app.config.setdefault('SQLALCHEMY_MAX_OVERFLOW', 5)
 app.config.setdefault('SQLALCHEMY_POOL_RECYCLE', 280)
 app.config.setdefault('SQLALCHEMY_POOL_PRE_PING', True)
 app.config.setdefault('SQLALCHEMY_ENGINE_OPTIONS', {
-    'pool_size': 3, 'max_overflow': 2, 'pool_recycle': 280, 'pool_pre_ping': True
+    'pool_size': 5, 'max_overflow': 5, 'pool_recycle': 280, 'pool_pre_ping': True
 })
 
 db.init_app(app)
@@ -112,7 +112,10 @@ app.jinja_env.globals['get_level']  = lambda pts: get_level(pts)  # set after ge
 def notify(user_id, type_, message, link=''):
     db.session.add(Notification(user_id=user_id, type=type_, message=message, link=link))
 
-_SKIP_PATHS = ('/avatar/', '/curso/', '/comunidad/banner', '/leccion-imagen/', '/static/', '/biblioteca/api/')
+_SKIP_PATHS = (
+    '/avatar/', '/curso/', '/comunidad/banner', '/leccion-imagen/',
+    '/static/', '/biblioteca/api/', '/healthz',
+)
 
 # Rutas accesibles con suscripción suspendida (gestionar pago)
 _SUBSCRIPTION_EXEMPT_ENDPOINTS = frozenset({
@@ -122,7 +125,7 @@ _SUBSCRIPTION_EXEMPT_ENDPOINTS = frozenset({
     'serve_avatar', 'serve_banner', 'serve_course_cover', 'serve_lesson_image',
     'serve_file', 'serve_commercial_landing_image',
     'legal_page', 'commercial_landing', 'commercial_landing_oferta',
-    'password_forgot', 'password_reset',
+    'password_forgot', 'password_reset', 'healthz',
 })
 
 _SUBSCRIPTION_EXEMPT_PREFIXES = ('/static/', '/webhooks/')
@@ -148,32 +151,25 @@ def enforce_subscription_access():
     return redirect(url_for('login'))
 
 
+@app.route('/healthz')
+def healthz():
+    """Liveness para Docker/Gunicorn: no toca la BD."""
+    return 'ok', 200, {'Content-Type': 'text/plain', 'Cache-Control': 'no-store'}
+
+
 @app.before_request
 def update_last_seen():
-    # Saltar rutas de imágenes y estáticos — no necesitan actualizar last_seen
-    if request.path.startswith(_SKIP_PATHS):
+    # Saltar rutas de imágenes, estáticos y health — no necesitan last_seen
+    if request.path.startswith(_SKIP_PATHS) or request.path == '/healthz':
         return
     if current_user.is_authenticated:
         now = datetime.utcnow()
         if not current_user.last_seen or (now - current_user.last_seen).total_seconds() > 60:
             current_user.last_seen = now
             try:
-                window_start = now
-                window_end   = now + timedelta(hours=24)
-                upcoming = LiveClass.query.filter(
-                    LiveClass.scheduled_at >= window_start,
-                    LiveClass.scheduled_at <= window_end
-                ).all()
-                for lc in upcoming:
-                    exists = Notification.query.filter_by(
-                        user_id=current_user.id, type='class_reminder', link='/calendario'
-                    ).filter(Notification.message.contains(lc.title)).first()
-                    if not exists:
-                        notify(current_user.id, 'class_reminder',
-                               f'🔔 "{lc.title}" empieza en menos de 24 horas', '/calendario')
+                db.session.commit()
             except Exception:
-                pass
-            db.session.commit()
+                db.session.rollback()
 
 def award_points(user_id, reason, ref_id, pts):
     if not PointEvent.query.filter_by(user_id=user_id, reason=reason, ref_id=ref_id).first():
