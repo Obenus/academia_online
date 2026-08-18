@@ -10,7 +10,9 @@ keepalive = 5
 max_requests = 400
 max_requests_jitter = 50
 worker_tmp_dir = '/dev/shm'
-bind = '0.0.0.0:' + os.environ.get('PORT', '5000')
+bind = os.environ.get('GUNICORN_BIND') or (
+    '0.0.0.0:' + os.environ.get('PORT', '5000')
+)
 preload_app = True
 worker_class = 'gthread'
 

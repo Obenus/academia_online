@@ -1,4 +1,5 @@
 """Facturación: Stripe, emails y estado de suscripción."""
+import os
 from datetime import datetime, timezone
 from html import escape
 
@@ -116,6 +117,8 @@ def _docker_host_ipv4_candidates():
             ips.append(hip)
     except OSError:
         pass
+    if os.environ.get('ACADEMIA_HOST_NETWORK', '').strip() == '1':
+        ips = ['127.0.0.1'] + [i for i in ips if i != '127.0.0.1']
     for fallback in ('172.17.0.1', '172.18.0.1'):
         if fallback not in ips:
             ips.append(fallback)

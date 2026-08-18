@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Comprueba el puerto 8080 del HOST. Si la app vive dentro del contenedor y el
-# host no responde, el puente Docker/iptables está roto: recrear SOLO la app
-# no sirve (bucle de 502). Hay que tumbar y levantar el stack SIN -v.
+# Comprueba 127.0.0.1:8080 (Plesk). Con la app en red del host ya no hay
+# puente iptables: si falla, se reinicia SOLO gunicorn, no todo el stack.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -9,7 +8,8 @@ cd "$ROOT"
 
 HOST_URL="${WATCHDOG_URL:-http://127.0.0.1:8080/healthz}"
 FAILS_NEEDED="${WATCHDOG_FAILS:-3}"
-COOLDOWN_SEC="${WATCHDOG_COOLDOWN:-900}"
+COOLDOWN_SEC="${WATCHDOG_COOLDOWN:-600}"
+GRACE_SEC="${WATCHDOG_GRACE:-90}"
 STATE_DIR="${WATCHDOG_STATE_DIR:-/var/tmp}"
 STATE="${STATE_DIR}/academia-watchdog.fails"
 COOLDOWN_FILE="${STATE_DIR}/academia-watchdog.cooldown"
@@ -27,19 +27,14 @@ host_ok() {
   curl -fsS -o /dev/null --max-time 5 "$HOST_URL"
 }
 
-inner_ok() {
-  docker exec miacademia-app python -c \
-    "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/healthz', timeout=3)" \
-    >/dev/null 2>&1
-}
-
-in_cooldown() {
-  [[ -f "$COOLDOWN_FILE" ]] || return 1
+seconds_since() {
+  local f="$1"
+  [[ -f "$f" ]] || { echo 99999; return; }
   local last now
-  last="$(tr -cd '0-9' < "$COOLDOWN_FILE" || true)"
+  last="$(tr -cd '0-9' < "$f" || true)"
   last="${last:-0}"
   now="$(date +%s)"
-  [[ $((now - last)) -lt "$COOLDOWN_SEC" ]]
+  echo $((now - last))
 }
 
 exec 9>"$LOCK"
@@ -49,6 +44,11 @@ fi
 
 if host_ok; then
   echo 0 > "$STATE"
+  exit 0
+fi
+
+if [[ "$(seconds_since "$COOLDOWN_FILE")" -lt "$GRACE_SEC" ]]; then
+  log "host no responde, pero estamos en gracia post-reinicio (${GRACE_SEC}s); espero"
   exit 0
 fi
 
@@ -65,24 +65,13 @@ if [[ "$fails" -lt "$FAILS_NEEDED" ]]; then
   exit 0
 fi
 
-if in_cooldown; then
-  log "en cooldown (${COOLDOWN_SEC}s tras el último repair); no recreo el stack otra vez"
+if [[ "$(seconds_since "$COOLDOWN_FILE")" -lt "$COOLDOWN_SEC" ]]; then
+  log "en cooldown (${COOLDOWN_SEC}s); no reinicio otra vez"
   exit 0
 fi
 
-if inner_ok; then
-  log "la app responde DENTRO: el puente 8080/iptables está colgado. Recreo la red (down+up, sin -v)"
-else
-  log "ni el host ni el contenedor responden. Recreo el stack (down+up, sin -v)"
-fi
-
-# Plesk a veces deja FORWARD en DROP y Docker deja de enrutar al contenedor.
-if command -v iptables >/dev/null 2>&1; then
-  iptables -P FORWARD ACCEPT 2>/dev/null || true
-fi
-
-"${COMPOSE[@]}" down
-"${COMPOSE[@]}" up -d
+log "reinicio solo miacademia-app (sin docker compose down)"
+"${COMPOSE[@]}" restart app
 date +%s > "$COOLDOWN_FILE"
 echo 0 > "$STATE"
-log "stack recreado; cooldown ${COOLDOWN_SEC}s"
+log "app reiniciada; gracia ${GRACE_SEC}s"

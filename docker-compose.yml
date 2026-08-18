@@ -4,11 +4,13 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: miacademia-app
-    ports:
-      # Solo localhost: Plesk/Nginx ya hace de proxy. Evita que Internet golpee docker-proxy.
-      - "127.0.0.1:8080:5000"
+    # Plesk habla con 127.0.0.1:8080. Publicar el puerto con Docker (iptables/DNAT)
+    # se rompe en este VPS aunque la app esté viva. La app escucha en el host.
+    network_mode: host
     environment:
-      PORT: 5000
+      ACADEMIA_HOST_NETWORK: "1"
+      PORT: "8080"
+      GUNICORN_BIND: "127.0.0.1:8080"
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/miacademia}
       ACADEMY_NAME: ${ACADEMY_NAME:-Marca Atractora}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
@@ -25,8 +27,6 @@ services:
       MAIL_USERNAME_FILE: /run/secrets/mail_username
       MAIL_PASSWORD_FILE: /run/secrets/mail_password
       STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - ./secrets:/run/secrets:ro
       - ./backups:/app/backups
@@ -35,7 +35,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/healthz', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
       interval: 20s
       timeout: 5s
       retries: 3

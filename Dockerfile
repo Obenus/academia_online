@@ -18,8 +18,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
-# Puerto interno de la app (Gunicorn usa PORT desde env)
-EXPOSE 5000
+EXPOSE 5000 8080
 
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["gunicorn", "-c", "gunicorn.conf.py", "app:app"]
