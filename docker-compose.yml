@@ -5,7 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: miacademia-app
     ports:
-      - "8080:5000"
+      # Solo localhost: Plesk/Nginx ya hace de proxy. Evita que Internet golpee docker-proxy.
+      - "127.0.0.1:8080:5000"
     environment:
       PORT: 5000
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/miacademia}
