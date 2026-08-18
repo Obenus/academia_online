@@ -2,7 +2,7 @@
 {% set ep = request.endpoint or '' %}
 
 <style>
-  .admin-shell { display:grid; gap:1.25rem; }
+  .admin-shell { display:grid; gap:1.25rem; position:relative; }
   @media (min-width:1024px) {
     .admin-shell { grid-template-columns:240px minmax(0,1fr); align-items:start; }
   }
@@ -38,63 +38,82 @@
   .admin-page-head { margin-bottom:1.25rem; }
   .admin-page-head h1 { font-size:1.35rem; font-weight:700; color:var(--text1); }
   .admin-page-head p { font-size:0.8125rem; color:var(--text4); margin-top:0.25rem; }
+  .admin-nav-toggle {
+    display:none;
+    width:100%;
+    align-items:center;
+    justify-content:space-between;
+    gap:0.5rem;
+    padding:0.7rem 0.9rem;
+    border-radius:12px;
+    border:1px solid var(--border);
+    background:var(--surface);
+    color:var(--text1);
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    margin-bottom:0.85rem;
+  }
+  .admin-nav-backdrop {
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(15,15,20,.35);
+    z-index:40;
+  }
+  @media (max-width:1023px) {
+    .admin-nav-toggle { display:flex; }
+    .admin-nav-backdrop.is-open { display:block; }
+    .admin-nav {
+      display:none;
+      position:absolute;
+      top:3.1rem;
+      left:0;
+      right:0;
+      z-index:45;
+      max-height:min(70vh, 28rem);
+      overflow-y:auto;
+      box-shadow:0 16px 40px rgba(0,0,0,.18);
+    }
+    .admin-nav.is-open { display:block; }
+  }
+  @media (min-width:1024px) {
+    .admin-nav-toggle, .admin-nav-backdrop { display:none !important; }
+  }
 </style>
 
 <div class="admin-shell">
-  <aside class="admin-nav">
-    <a href="{{ url_for('admin_dashboard') }}"
-       class="admin-nav-link mb-1 {% if ep=='admin_dashboard' %}active{% endif %}">
-      🏠 Inicio
-    </a>
-
-    <div class="admin-nav-group">
-      <p class="admin-nav-label">Comunidad</p>
-      <a href="{{ url_for('admin_settings') }}" class="admin-nav-link {% if ep=='admin_settings' %}active{% endif %}">⚙️ Ajustes y marca</a>
-      <a href="{{ url_for('admin_landing') }}" class="admin-nav-link {% if ep=='admin_landing' %}active{% endif %}">🌸 Landing principal</a>
-      <a href="{{ url_for('admin_commercial_landing') }}" class="admin-nav-link {% if ep in ('admin_commercial_landing','admin_commercial_leads') %}active{% endif %}">📣 Landing comercial</a>
-      <a href="{{ url_for('admin_legal') }}" class="admin-nav-link {% if ep=='admin_legal' %}active{% endif %}">📜 Textos legales</a>
-      <a href="{{ url_for('new_post') }}" class="admin-nav-link {% if ep=='new_post' %}active{% endif %}">✏️ Publicar post</a>
-      <a href="{{ url_for('features.admin_moderation') }}" class="admin-nav-link {% if ep=='features.admin_moderation' %}active{% endif %}">
-        🛡 Moderación
-        {% if admin_nav.pending_reports %}<span class="admin-nav-badge">{{ admin_nav.pending_reports }}</span>{% endif %}
-      </a>
-    </div>
-
-    <div class="admin-nav-group">
-      <p class="admin-nav-label">Contenido</p>
-      <a href="{{ url_for('library.admin_list') }}" class="admin-nav-link {% if ep and ep.startswith('library.') %}active{% endif %}">📚 Biblioteca</a>
-      <a href="{{ url_for('resources.admin_list') }}" class="admin-nav-link {% if ep and ep.startswith('resources.') %}active{% endif %}">📎 Recursos</a>
-      <a href="{{ url_for('admin_courses') }}" class="admin-nav-link {% if ep in ('admin_courses','admin_new_course','admin_edit_course') %}active{% endif %}">🎓 Cursos (legacy)</a>
-    </div>
-
-    <div class="admin-nav-group">
-      <p class="admin-nav-label">Calendario</p>
-      <a href="{{ url_for('admin_live_classes') }}" class="admin-nav-link {% if ep in ('admin_live_classes','admin_new_live_class','admin_edit_live_class') %}active{% endif %}">📅 Eventos</a>
-      <a href="{{ url_for('admin_calendar_theme') }}" class="admin-nav-link {% if ep=='admin_calendar_theme' %}active{% endif %}">🎨 Temática mensual</a>
-    </div>
-
-    <div class="admin-nav-group">
-      <p class="admin-nav-label">Miembros</p>
-      <a href="{{ url_for('admin_users') }}" class="admin-nav-link {% if ep=='admin_users' %}active{% endif %}">👥 Usuarios</a>
-      <a href="{{ url_for('admin_subscriptions') }}" class="admin-nav-link {% if ep=='admin_subscriptions' %}active{% endif %}">
-        📊 Suscripciones
-        {% if admin_nav.whatsapp_pending %}<span class="admin-nav-badge">{{ admin_nav.whatsapp_pending }}</span>{% endif %}
-      </a>
-      <a href="{{ url_for('admin_email') }}" class="admin-nav-link {% if ep=='admin_email' %}active{% endif %}">📧 Email masivo</a>
-    </div>
-
-    <div class="admin-nav-group">
-      <p class="admin-nav-label">Facturación</p>
-      <a href="{{ url_for('admin_plans') }}" class="admin-nav-link {% if ep=='admin_plans' %}active{% endif %}">📋 Planes</a>
-      <a href="{{ url_for('admin_payments') }}" class="admin-nav-link {% if ep=='admin_payments' %}active{% endif %}">💳 Stripe</a>
-    </div>
-
-    <div class="admin-nav-group">
-      <p class="admin-nav-label">Sistema</p>
-      <a href="{{ url_for('features.admin_stats') }}" class="admin-nav-link {% if ep=='features.admin_stats' %}active{% endif %}">📈 Estadísticas</a>
-      <a href="{{ url_for('admin_backups') }}" class="admin-nav-link {% if ep=='admin_backups' %}active{% endif %}">💾 Backups</a>
-      <a href="{{ url_for('features.admin_assignments') }}" class="admin-nav-link {% if ep=='features.admin_assignments' %}active{% endif %}">📤 Entregas</a>
-    </div>
+  <button type="button" class="admin-nav-toggle" id="admin-nav-toggle" aria-expanded="false" aria-controls="admin-nav-panel">
+    <span>⚙️ Menú admin</span>
+    <span id="admin-nav-chev">▾</span>
+  </button>
+  <div class="admin-nav-backdrop" id="admin-nav-backdrop"></div>
+  <aside class="admin-nav" id="admin-nav-panel">
+    {% include 'admin/_links.html' %}
   </aside>
+  <script>
+  (function () {
+    var btn = document.getElementById('admin-nav-toggle');
+    var panel = document.getElementById('admin-nav-panel');
+    var back = document.getElementById('admin-nav-backdrop');
+    var chev = document.getElementById('admin-nav-chev');
+    if (!btn || !panel) return;
+    function closeNav() {
+      panel.classList.remove('is-open');
+      if (back) back.classList.remove('is-open');
+      btn.setAttribute('aria-expanded', 'false');
+      if (chev) chev.textContent = '▾';
+    }
+    function toggleNav() {
+      var open = !panel.classList.contains('is-open');
+      panel.classList.toggle('is-open', open);
+      if (back) back.classList.toggle('is-open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (chev) chev.textContent = open ? '▴' : '▾';
+    }
+    btn.addEventListener('click', toggleNav);
+    if (back) back.addEventListener('click', closeNav);
+  })();
+  </script>
 
   <div class="admin-main min-w-0">

@@ -145,6 +145,23 @@ document.addEventListener('DOMContentLoaded',function(){
                       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .file-upload-name.has-file { color:var(--text2); font-weight:500; }
 
+  #admin-submenu { padding:0.35rem 0 0.5rem; }
+  #admin-submenu .admin-nav-group { margin-bottom:0.25rem; }
+  #admin-submenu .admin-nav-label {
+    font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--text4); padding:0.4rem 1rem 0.15rem;
+  }
+  #admin-submenu .admin-nav-link {
+    display:flex; align-items:center; gap:0.5rem;
+    padding:0.45rem 1rem; font-size:13px; font-weight:500;
+    color:var(--text2); text-decoration:none;
+  }
+  #admin-submenu .admin-nav-link:hover { background:var(--surface); color:var(--text1); }
+  #admin-submenu .admin-nav-link.active { color:var(--brand-primary, #7c3aed); font-weight:600; }
+  #admin-submenu .admin-nav-badge {
+    margin-left:auto; font-size:10px; font-weight:700;
+    background:#ef4444; color:#fff; padding:1px 6px; border-radius:999px;
+  }
   @media (max-width:767px) {
     .page-head { flex-direction:column; align-items:flex-start !important; gap:0.75rem; }
     .page-head .btn { width:100%; justify-content:center; }
@@ -258,7 +275,7 @@ document.addEventListener('DOMContentLoaded',function(){
         <span class="text-sm font-medium hidden sm:block" style="color:var(--text1)">{{ current_user.username }}</span>
         <span class="text-xs hidden sm:block" style="color:var(--text4)">▾</span>
       </button>
-      <div id="user-menu" class="hidden absolute right-0 top-10 w-44 rounded-xl shadow-lg z-50 overflow-hidden"
+      <div id="user-menu" class="hidden absolute right-0 top-10 w-64 max-w-[90vw] rounded-xl shadow-lg z-50 overflow-hidden"
            style="background:var(--surface);border:1px solid var(--border)">
         <a href="{{ url_for('account_settings') }}"
            class="flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5]"
@@ -273,11 +290,19 @@ document.addEventListener('DOMContentLoaded',function(){
            class="flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5] md:hidden"
            style="color:var(--text1)">📎 Recursos</a>
         {% if current_user.is_admin %}
-        <a href="{{ url_for('admin_dashboard') }}"
-           class="flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5] md:hidden"
-           style="color:var(--text1)">⚙️ Admin</a>
+        <button type="button" id="admin-submenu-btn" onclick="event.stopPropagation(); toggleAdminSubmenu()"
+                class="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5] md:hidden"
+                style="color:var(--text1);background:transparent;border:none;cursor:pointer;text-align:left">
+          <span>⚙️ Admin</span>
+          <span id="admin-submenu-chev">▸</span>
+        </button>
+        <div id="admin-submenu" class="hidden md:hidden overflow-y-auto"
+             style="max-height:min(50vh,22rem);border-top:1px solid var(--border);background:var(--hover-bg, #f4f4f5)">
+          {% set admin_link_class = 'admin-nav-link' %}
+          {% include 'admin/_links.html' %}
+        </div>
         <a href="{{ url_for('admin_backups') }}"
-           class="flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5]"
+           class="hidden md:flex items-center gap-2 px-4 py-3 text-sm transition hover:bg-[#f4f4f5]"
            style="color:var(--text1)">💾 Backups</a>
         {% endif %}
         <div style="border-top:1px solid var(--border)"></div>
@@ -363,6 +388,18 @@ document.addEventListener('DOMContentLoaded',function(){
   function toggleUserMenu() {
     document.getElementById('user-menu').classList.toggle('hidden');
     document.getElementById('notif-menu').classList.add('hidden');
+    const sub = document.getElementById('admin-submenu');
+    const chev = document.getElementById('admin-submenu-chev');
+    if (sub) sub.classList.add('hidden');
+    if (chev) chev.textContent = '▸';
+  }
+
+  function toggleAdminSubmenu() {
+    const sub = document.getElementById('admin-submenu');
+    const chev = document.getElementById('admin-submenu-chev');
+    if (!sub) return;
+    sub.classList.toggle('hidden');
+    if (chev) chev.textContent = sub.classList.contains('hidden') ? '▸' : '▾';
   }
 
   // ── Notifications ──
