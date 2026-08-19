@@ -12,6 +12,21 @@ Déjanos tu nombre y email y te enviaremos el acceso al grupo.''',
 <p>Gracias por tu interés. Aquí tienes el enlace al grupo de WhatsApp:</p>
 <p><a href="{{whatsapp_url}}" style="display:inline-block;background:#25D366;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600" target="_blank" rel="noopener noreferrer">Entrar al grupo</a></p>
 <p style="color:#71717a;font-size:12px">Si el botón no funciona, copia este enlace:<br>{{whatsapp_url}}</p>''',
+    'commercial_success_text': '''¡Ya estás dentro! 💛
+
+Tu registro para el Encuentro Nunca Tan Yo se ha realizado correctamente.
+
+📩 Revisa tu correo, porque te hemos enviado toda la información. Si no lo encuentras, mira también en Spam, Promociones o Correo no deseado y márcanos como remitente seguro para que no te pierdas nada.
+
+💬 Y si quieres estar aún más al día, puedes unirte al grupo de WhatsApp de Nunca Tan Yo, donde iremos compartiendo recordatorios, novedades y toda la información del encuentro.''',
+    'commercial_success_button_text': 'UNIRME AL GRUPO DE WHATSAPP',
+    'commercial_success_footer': '''Nos vemos muy pronto.
+Qué ganas de encontrarnos. 💛''',
+    'commercial_existing_text': '''Ya estabas registrada en esta lista 💛
+
+No hace falta volver a apuntarte. Revisa tu correo, porque te hemos enviado toda la información.
+
+📩 Si no lo encuentras, mira también en Spam, Promociones o Correo no deseado y márcanos como remitente seguro para que no te pierdas nada.''',
 }
 
 

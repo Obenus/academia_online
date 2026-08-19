@@ -94,6 +94,24 @@ Un lugar donde volver a ti.''',
     'landing_price_note': 'Sin permanencia · Cancela cuando quieras',
     'landing_login_title': '¿Ya eres miembro?',
     'landing_login_subtitle': 'Accede con tu email y contraseña',
+    'landing_success_text': '''¡Bienvenida a Nunca Tan Yo! 💛
+
+Tu registro se ha completado correctamente y ya formas parte de la comunidad.
+
+📩 Revisa tu correo, porque te hemos enviado toda la información de acceso. Si no lo encuentras, mira también en Spam, Promociones o Correo no deseado y márcanos como remitente seguro para no perderte nada.
+
+Ahora empieza lo importante: entrar, mirar, curiosear, resolver tus primeras dudas… y empezar a hacerte un poco más de hueco a ti dentro de tu propia vida.
+
+✨ Accede a la comunidad y descubre todo lo que tienes disponible: contenidos, ayuda, encuentros, herramientas y un espacio donde compartir lo que te pasa con mujeres que probablemente están viviendo muchas de las mismas cosas que tú.
+
+No tienes que hacerlo todo hoy. Empieza por entrar, echar un vistazo y ver qué es lo que más necesitas ahora.
+
+Porque sí: ya estás un poquito más cerca de hacer muchos de esos cambios que llevas tiempo pensando.
+
+💬 Y una cosa más: pídele a Rocío acceso al grupo VIP de WhatsApp de Nunca Tan Yo, donde estaremos todavía más cerca, compartiremos avisos, encuentros, novedades y contenido especial.''',
+    'landing_success_button_text': 'ACCEDER A LA COMUNIDAD',
+    'landing_success_footer': '''Nos vemos dentro.
+Esto acaba de empezar. 💛''',
 }
 
 # Vídeos opcionales entre bloques de texto (el de tras intro es landing_video_url, ya existente).
@@ -114,6 +132,7 @@ LANDING_FORM_FIELDS = [
     'landing_how_helps', 'landing_explore_questions', 'landing_includes',
     'landing_for_you', 'landing_closing', 'landing_cta_text', 'landing_price_note',
     'landing_login_title', 'landing_login_subtitle',
+    'landing_success_text', 'landing_success_button_text', 'landing_success_footer',
     'landing_video_after_title', 'landing_video_after_hook',
     'landing_video_after_what_is', 'landing_video_after_how_helps',
     'landing_video_after_explore', 'landing_video_after_includes',

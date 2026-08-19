@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>{{ title }} — {{ site.academy_name or academy_name }}</title>
+<script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/theme.css"/>
+<style>
+  body { background:#faf8f6; color:#2d2a26; font-family:'Segoe UI',system-ui,sans-serif; margin:0; line-height:1.65; }
+  .wrap { max-width:680px; margin:0 auto; padding:2rem 1rem 3rem; }
+  .card { background:#fff; border:1px solid #ebe6e1; border-radius:20px; padding:1.5rem; box-shadow:0 8px 30px rgba(45,42,38,.06); }
+  .prose h1,.prose h2,.prose h3 { font-weight:700; margin:0.85rem 0 .65rem; color:#2d2a26; }
+  .prose p { color:#6b6560; margin-bottom:.75rem; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; width:100%; padding:.9rem 1.5rem; border-radius:12px; font-weight:700; border:none; cursor:pointer; background:var(--color-primary, #7c3aed); color:#fff; text-decoration:none; }
+</style>
+{% if brand_style %}<style>:root{ {{ brand_style }} }</style>{% endif %}
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1 class="text-2xl font-extrabold mb-4">{{ title }}</h1>
+    {% if body_html %}
+    <div class="prose mb-5">{{ body_html }}</div>
+    {% endif %}
+    {% if button_url %}
+    <a href="{{ button_url }}" {% if button_url.startswith('http') %}target="_blank" rel="noopener"{% endif %} class="btn mb-5">{{ button_text }}</a>
+    {% endif %}
+    {% if footer_html %}
+    <div class="prose">{{ footer_html }}</div>
+    {% endif %}
+  </div>
+</div>
+{% include 'includes/legal_footer.html' %}
+</body>
+</html>

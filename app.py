@@ -506,6 +506,24 @@ def register():
 def register_checkout_success():
     return redirect(url_for('checkout_success', session_id=request.args.get('session_id', '')))
 
+
+@app.route('/registro/exito/landing')
+def landing_register_success():
+    s = get_settings()
+    text = (getattr(s, 'landing_success_text', None) or '').strip() or LANDING_DEFAULTS.get('landing_success_text', '')
+    footer = (getattr(s, 'landing_success_footer', None) or '').strip() or LANDING_DEFAULTS.get('landing_success_footer', '')
+    button = (getattr(s, 'landing_success_button_text', None) or '').strip() or LANDING_DEFAULTS.get('landing_success_button_text', 'ACCEDER A LA COMUNIDAD')
+    return render_template(
+        'public/landing_success.html',
+        site=s,
+        title='¡Registro completado!',
+        body_html=render_markdown(text),
+        footer_html=render_markdown(footer),
+        button_text=button,
+        button_url=url_for('login'),
+    )
+
+
 @app.route('/logout')
 @login_required
 def logout():
@@ -683,9 +701,7 @@ def checkout_success():
         if not user:
             flash('No se pudo crear la cuenta. Contacta con soporte.', 'error')
             return redirect(url_for('login'))
-        login_user(user, remember=True)
-        flash('¡Bienvenida! Revisa tu email con los datos de acceso.', 'success')
-        return redirect(url_for('start_here'))
+        return redirect(url_for('landing_register_success'))
     except Exception as e:
         flash(f'Error al verificar el pago: {e}', 'error')
         return redirect(url_for('login'))
@@ -1471,6 +1487,10 @@ def admin_commercial_landing():
         body_clean, wa_clean = sanitize_commercial_reply_body(body_raw, wa_raw)
         s.commercial_reply_body = body_clean
         s.commercial_reply_whatsapp_url = wa_clean or normalize_https_url(wa_raw)
+        s.commercial_success_text = request.form.get('commercial_success_text', '')
+        s.commercial_success_button_text = request.form.get('commercial_success_button_text', '').strip()
+        s.commercial_success_footer = request.form.get('commercial_success_footer', '')
+        s.commercial_existing_text = request.form.get('commercial_existing_text', '')
         img = request.files.get('commercial_landing_image')
         if img and img.filename:
             try:
@@ -1587,6 +1607,9 @@ def _render_commercial_landing():
         if not name or not email or not privacy:
             flash('Completa nombre, email y acepta la política de privacidad.', 'error')
             return redirect(request.path)
+        existing = CommercialLead.query.filter_by(email=email).first()
+        if existing:
+            return redirect(url_for('commercial_landing_success', slug=s.commercial_landing_slug or 'oferta', existing='1'))
         lead = CommercialLead(name=name, email=email, privacy_accepted=True)
         db.session.add(lead)
         db.session.commit()
@@ -1636,8 +1659,7 @@ def _render_commercial_landing():
             except Exception as e:
                 print(f'[commercial] notify email: {e}')
 
-        flash('¡Gracias! Te hemos enviado un email con la información.', 'success')
-        return redirect(request.path)
+        return redirect(url_for('commercial_landing_success', slug=s.commercial_landing_slug or 'oferta'))
 
     return render_template(
         'public/commercial_landing.html',
@@ -1656,6 +1678,31 @@ def commercial_landing_oferta():
     if slug != 'oferta':
         return redirect(f'/{slug}', code=302)
     return _render_commercial_landing()
+
+
+@app.route('/<slug>/registro-exitoso')
+def commercial_landing_success(slug):
+    s = get_settings()
+    expected = normalize_slug(getattr(s, 'commercial_landing_slug', None), 'oferta')
+    if slug != expected:
+        abort(404)
+    existing = request.args.get('existing') == '1'
+    body_default = COMMERCIAL_DEFAULTS['commercial_existing_text'] if existing else COMMERCIAL_DEFAULTS['commercial_success_text']
+    body_raw = (getattr(s, 'commercial_existing_text', None) if existing else getattr(s, 'commercial_success_text', None)) or ''
+    body_text = body_raw.strip() or body_default
+    footer_raw = getattr(s, 'commercial_success_footer', None) or ''
+    footer_text = footer_raw.strip() or COMMERCIAL_DEFAULTS['commercial_success_footer']
+    button_text = (getattr(s, 'commercial_success_button_text', None) or '').strip() or COMMERCIAL_DEFAULTS['commercial_success_button_text']
+    button_url = normalize_https_url((s.commercial_landing_whatsapp_url or '').strip())
+    return render_template(
+        'public/landing_success.html',
+        site=s,
+        title='¡Ya estás dentro!' if not existing else 'Ya estabas registrada',
+        body_html=render_markdown(body_text),
+        footer_html=render_markdown(footer_text),
+        button_text=button_text,
+        button_url=button_url,
+    )
 
 
 @app.route('/admin/backups', methods=['GET', 'POST'])
@@ -4831,6 +4878,9 @@ else:
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_price_note VARCHAR(200) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_title VARCHAR(200) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_subtitle VARCHAR(300) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_success_text TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_success_button_text VARCHAR(200) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_success_footer TEXT DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_url VARCHAR(500) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_after_title VARCHAR(500) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_video_after_hook VARCHAR(500) DEFAULT ''"))
@@ -4857,6 +4907,10 @@ else:
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_subject VARCHAR(300) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_body TEXT DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_reply_whatsapp_url VARCHAR(500) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_success_text TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_success_button_text VARCHAR(200) DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_success_footer TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS commercial_existing_text TEXT DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS library_catalog_order TEXT DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_server VARCHAR(200) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS mail_port INTEGER DEFAULT 587"))

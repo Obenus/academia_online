@@ -35,7 +35,8 @@
   {% endwith %}
 
   {% if s.commercial_landing_image_data %}
-  <img src="{{ url_for('serve_commercial_landing_image') }}" alt="" class="hero-img"/>
+  <img src="{{ url_for('serve_commercial_landing_image') }}" alt="" class="hero-img"
+       loading="eager" decoding="async" fetchpriority="high"/>
   {% endif %}
 
   <h1 class="text-2xl font-extrabold mb-4">{{ s.commercial_landing_title or 'Oferta' }}</h1>
@@ -45,12 +46,13 @@
   {% endif %}
 
   {% if video_embed %}
-  <div class="mb-6 relative w-full overflow-hidden rounded-2xl bg-black" style="padding-bottom:56.25%">
-    <iframe src="{{ video_embed }}" title="Vídeo"
-      class="absolute inset-0 w-full h-full border-0"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowfullscreen loading="lazy"
-      referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  <div class="mb-6 relative w-full overflow-hidden rounded-2xl bg-black js-lazy-video-wrap" style="padding-bottom:56.25%">
+    <button type="button"
+      class="absolute inset-0 w-full h-full flex items-center justify-center text-white bg-black/40 hover:bg-black/25 transition js-lazy-video-play"
+      data-src="{{ video_embed }}"
+      aria-label="Reproducir vídeo">
+      <span class="inline-flex items-center justify-center w-16 h-16 rounded-full border border-white/40 bg-black/45 text-2xl">▶</span>
+    </button>
   </div>
   {% endif %}
 
@@ -86,5 +88,22 @@
   </div>
 </div>
 {% include 'includes/legal_footer.html' %}
+<script>
+document.querySelectorAll('.js-lazy-video-play').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const src = btn.dataset.src;
+    if (!src) return;
+    const iframe = document.createElement('iframe');
+    iframe.src = src;
+    iframe.title = 'Vídeo';
+    iframe.className = 'absolute inset-0 w-full h-full border-0';
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    iframe.allowFullscreen = true;
+    iframe.loading = 'lazy';
+    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+    btn.replaceWith(iframe);
+  }, { once: true });
+});
+</script>
 </body>
 </html>

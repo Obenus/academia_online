@@ -78,6 +78,25 @@
       <input type="url" name="commercial_reply_whatsapp_url" class="input" value="{{ s.commercial_reply_whatsapp_url or '' }}" placeholder="https://chat.whatsapp.com/..."/>
       <p class="text-[11px] mt-1" style="color:var(--text4)">Vacío = se usa el mismo enlace WhatsApp de la página. Debe empezar por https://</p>
     </div>
+    <hr style="border-color:var(--border)"/>
+    <h2 class="text-sm font-bold" style="color:var(--text1)">Página de registro exitoso</h2>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto principal (nuevo registro, Markdown)</label>
+      <textarea name="commercial_success_text" class="input font-mono text-sm" rows="8">{{ s.commercial_success_text or defaults.commercial_success_text }}</textarea>
+    </div>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto del botón</label>
+      <input type="text" name="commercial_success_button_text" class="input" value="{{ s.commercial_success_button_text or defaults.commercial_success_button_text }}"/>
+      <p class="text-[11px] mt-1" style="color:var(--text4)">El botón abre el enlace de WhatsApp configurado arriba.</p>
+    </div>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto de despedida (Markdown)</label>
+      <textarea name="commercial_success_footer" class="input font-mono text-sm" rows="4">{{ s.commercial_success_footer or defaults.commercial_success_footer }}</textarea>
+    </div>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto cuando el lead ya existe (Markdown)</label>
+      <textarea name="commercial_existing_text" class="input font-mono text-sm" rows="6">{{ s.commercial_existing_text or defaults.commercial_existing_text }}</textarea>
+    </div>
     <button type="submit" class="btn btn-primary">Guardar landing comercial</button>
   </form>
 </div>

@@ -3,12 +3,13 @@
 {% set embed = _vid|video_embed_public %}
 {% if embed %}
 <section class="conv-section">
-  <div class="relative w-full overflow-hidden rounded-2xl bg-black" style="padding-bottom:56.25%">
-    <iframe src="{{ embed }}" title="Vídeo"
-      class="absolute inset-0 w-full h-full border-0"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowfullscreen loading="lazy"
-      referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  <div class="relative w-full overflow-hidden rounded-2xl bg-black js-lazy-video-wrap" style="padding-bottom:56.25%">
+    <button type="button"
+      class="absolute inset-0 w-full h-full flex items-center justify-center text-white bg-black/40 hover:bg-black/25 transition js-lazy-video-play"
+      data-src="{{ embed }}"
+      aria-label="Reproducir vídeo">
+      <span class="inline-flex items-center justify-center w-16 h-16 rounded-full border border-white/40 bg-black/45 text-2xl">▶</span>
+    </button>
   </div>
 </section>
 {% endif %}

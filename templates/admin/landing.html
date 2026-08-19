@@ -139,6 +139,22 @@
       </div>
     </div>
 
+    <hr style="border-color:var(--border)"/>
+    <h2 class="text-sm font-bold" style="color:var(--text1)">Página de registro exitoso</h2>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto principal (Markdown)</label>
+      <textarea name="landing_success_text" class="input" rows="10">{{ s.landing_success_text or defaults.landing_success_text }}</textarea>
+    </div>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto del botón</label>
+      <input type="text" name="landing_success_button_text" class="input" value="{{ s.landing_success_button_text or defaults.landing_success_button_text }}"/>
+      <p class="text-[11px] mt-1" style="color:var(--text4)">El botón siempre lleva al login de la plataforma.</p>
+    </div>
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Texto de despedida (Markdown)</label>
+      <textarea name="landing_success_footer" class="input" rows="4">{{ s.landing_success_footer or defaults.landing_success_footer }}</textarea>
+    </div>
+
     <div class="flex flex-col sm:flex-row gap-3 pt-2">
       <button type="submit" class="btn btn-primary flex-1 justify-center">Guardar landing</button>
       <button type="submit" name="action" value="reset"
