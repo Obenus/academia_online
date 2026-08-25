@@ -82,7 +82,7 @@
           <p class="text-2xl font-bold text-violet-700">
             <span class="price-es" {% if region!='es' %}style="display:none"{% endif %}>{{ '%.2f'|format(plan.price_for_region('es')) }} €</span>
             <span class="price-intl" {% if region!='intl' %}style="display:none"{% endif %}>{{ '%.2f'|format(plan.price_for_region('intl')) }} €</span>
-            <span class="text-sm font-normal text-zinc-500">/mes</span>
+            <span class="text-sm font-normal text-zinc-500">{{ plan.price_suffix() }}</span>
           </p>
         </label>
         {% else %}
@@ -90,15 +90,23 @@
         {% endfor %}
       </div>
 
-      {% if plans and stripe_pk %}
-      <button type="submit" class="btn btn-primary w-full text-base">Únete ahora →</button>
+      {% if payment_test_mode and plans %}
+      <div class="space-y-2 mb-4 max-w-md mx-auto">
+        <p class="text-center text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">Modo test: no se cobrará en Stripe</p>
+        <input type="email" name="customer_email" class="input w-full" placeholder="Tu email *" required/>
+        <input type="text" name="customer_name" class="input w-full" placeholder="Tu nombre (opcional)"/>
+      </div>
+      {% endif %}
+
+      {% if plans and checkout_ready %}
+      <button type="submit" class="btn btn-primary w-full text-base">{% if payment_test_mode %}Simular compra (test) →{% else %}Únete ahora →{% endif %}</button>
       {% elif plans %}
       <p class="text-center text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">Los pagos aún no están configurados. Contacta con el administrador.</p>
       {% endif %}
     </form>
   </div>
 
-  <p class="text-center text-xs text-zinc-400">Pago seguro con Stripe · Acceso inmediato tras el pago</p>
+  <p class="text-center text-xs text-zinc-400">{% if payment_test_mode %}Modo test · sin cobro real{% else %}Pago seguro con Stripe · Acceso inmediato tras el pago{% endif %}</p>
 </main>
 
 <script>

@@ -52,6 +52,7 @@ from commercial_content import (
 from backup_manager import run_backup, encrypt_value, decrypt_value, list_local_backups, restore_backup
 from billing import (
     payments_enabled, get_stripe_secret, get_stripe_public, get_stripe_webhook_secret,
+    payment_test_mode, checkout_ready, build_test_checkout_session, as_plain_dict,
     create_subscription_checkout, create_public_subscription_checkout,
     sync_stripe_subscription, send_welcome_email,
     send_admin_registration_email, notify_admins_payment_failed, user_payment_label,
@@ -332,12 +333,15 @@ def _conversion_landing_context():
     plans = SubscriptionPlan.query.filter_by(is_active=True).order_by(
         SubscriptionPlan.sort_order, SubscriptionPlan.id
     ).all()
+    test_mode = payment_test_mode(app)
     return dict(
         site=site,
         plans=plans,
         region=region,
         region_label=billing_region_label(region),
         stripe_pk=get_stripe_public(app),
+        checkout_ready=checkout_ready(app),
+        payment_test_mode=test_mode,
         landing_text=landing_text,
         landing_paragraphs=landing_paragraphs,
         landing_lines=landing_lines,
@@ -632,13 +636,45 @@ def landing():
 def checkout_start():
     plan_id = request.form.get('plan_id', type=int)
     region = detect_billing_region('es')
+    form_region = (request.form.get('billing_region') or '').strip().lower()
+    if form_region in ('es', 'intl'):
+        region = form_region
     plan = SubscriptionPlan.query.filter_by(id=plan_id, is_active=True).first()
     if not plan or not payments_enabled(app):
         flash('Plan no disponible o pagos no configurados.', 'error')
         return redirect(url_for('login'))
+
     intent = CheckoutIntent(plan_id=plan.id, billing_region=region, status='pending')
     db.session.add(intent)
     db.session.commit()
+
+    # Modo test: simula pago completo sin llamar a Stripe
+    if payment_test_mode(app):
+        email = (request.form.get('customer_email') or '').strip().lower()
+        name = (request.form.get('customer_name') or '').strip()
+        if not email or '@' not in email:
+            db.session.delete(intent)
+            db.session.commit()
+            flash('En modo test indica un email válido para crear la cuenta.', 'error')
+            return redirect(url_for('login'))
+        try:
+            sess = build_test_checkout_session(
+                intent, plan, email=email, name=name, region=region,
+            )
+            intent.stripe_session_id = sess['id']
+            intent.customer_email = email
+            intent.customer_name = name
+            db.session.commit()
+            user, _created, _pw = create_user_from_checkout(app, mail, sess, get_settings)
+            if not user:
+                flash('No se pudo crear la cuenta de prueba. Revisa el email.', 'error')
+                return redirect(url_for('login'))
+            flash('Pago de prueba simulado correctamente (sin cobro en Stripe).', 'success')
+            return redirect(url_for('landing_register_success'))
+        except Exception as e:
+            flash(f'Error en pago de prueba: {e}', 'error')
+            return redirect(url_for('login'))
+
     try:
         session = create_public_subscription_checkout(
             app, plan, region,
@@ -671,8 +707,8 @@ def checkout_success():
             try:
                 import stripe
                 stripe.api_key = stripe_key
-                s = stripe.checkout.Session.retrieve(session_id)
-                payment_ok = (s.payment_status == 'paid')
+                s = as_plain_dict(stripe.checkout.Session.retrieve(session_id))
+                payment_ok = (s.get('payment_status') == 'paid')
             except Exception:
                 payment_ok = False
         if payment_ok and not current_user.is_enrolled(course_id):
@@ -691,18 +727,28 @@ def checkout_success():
         flash('Sesión de pago no válida.', 'error')
         return redirect(url_for('login'))
     try:
+        # Sesión simulada (modo test) ya procesada en checkout_start
+        if session_id.startswith('cs_test_mode_'):
+            intent = CheckoutIntent.query.filter_by(stripe_session_id=session_id).first()
+            if intent and intent.user_id:
+                return redirect(url_for('landing_register_success'))
+            flash('Sesión de prueba no encontrada.', 'error')
+            return redirect(url_for('login'))
+
         import stripe
         stripe.api_key = get_stripe_secret(app)
         sess = stripe.checkout.Session.retrieve(session_id, expand=['subscription'])
-        if sess.payment_status != 'paid':
+        sess_dict = as_plain_dict(sess)
+        if sess_dict.get('payment_status') != 'paid':
             flash('El pago no se ha completado.', 'error')
             return redirect(url_for('login'))
-        user, created, _pw = create_user_from_checkout(app, mail, sess, get_settings)
+        user, created, _pw = create_user_from_checkout(app, mail, sess_dict, get_settings)
         if not user:
             flash('No se pudo crear la cuenta. Contacta con soporte.', 'error')
             return redirect(url_for('login'))
         return redirect(url_for('landing_register_success'))
     except Exception as e:
+        print(f'[checkout_success] {e}')
         flash(f'Error al verificar el pago: {e}', 'error')
         return redirect(url_for('login'))
 
@@ -1795,6 +1841,7 @@ def admin_payments():
         action = request.form.get('action', 'settings')
         if action == 'settings':
             s.payments_enabled = _is_true(request.form.get('payments_enabled'))
+            s.payment_test_mode = _is_true(request.form.get('payment_test_mode'))
             s.pay_auto_activate = _is_true(request.form.get('pay_auto_activate'))
             s.stripe_public_key = request.form.get('stripe_public_key', '').strip()
             sk = request.form.get('stripe_secret_key', '').strip()
@@ -1848,11 +1895,15 @@ def admin_plans():
             price_y_f = 0.0
         trial = int(request.form.get('trial_days', 0) or 0)
         coupon = request.form.get('stripe_coupon_id', '').strip()
+        billing_interval = request.form.get('billing_interval', 'month').strip()
+        if billing_interval not in ('month', 'year'):
+            billing_interval = 'month'
         if name:
             db.session.add(SubscriptionPlan(
                 name=name, description=desc, price_monthly=price_f,
                 price_monthly_es=price_es_f, price_monthly_intl=price_intl_f,
                 price_yearly=price_y_f,
+                billing_interval=billing_interval,
                 stripe_price_id=stripe_price,
                 stripe_price_id_es=request.form.get('plan_stripe_price_id_es', '').strip(),
                 stripe_price_id_intl=request.form.get('plan_stripe_price_id_intl', '').strip(),
@@ -1870,9 +1921,10 @@ def admin_plans():
     for p in plans_raw:
         plans.append({
             'id': p.id, 'name': p.name, 'description': p.description,
-            'price_monthly': p.price_monthly, 'price_monthly_es': p.price_for_region('es'),
-            'price_monthly_intl': p.price_for_region('intl'),
+            'price_monthly': p.price_monthly, 'price_monthly_es': p.price_monthly_es or p.price_monthly,
+            'price_monthly_intl': p.price_monthly_intl or p.price_monthly,
             'price_yearly': getattr(p, 'price_yearly', 0) or 0,
+            'billing_interval': getattr(p, 'billing_interval', 'month') or 'month',
             'stripe_price_id': p.stripe_price_id,
             'stripe_price_id_es': getattr(p, 'stripe_price_id_es', '') or '',
             'stripe_price_id_intl': getattr(p, 'stripe_price_id_intl', '') or '',
@@ -1917,6 +1969,8 @@ def admin_edit_plan(plan_id):
     except ValueError:
         pass
     plan.stripe_price_id_yearly = request.form.get('plan_stripe_price_id_yearly', '').strip()
+    billing_interval = request.form.get('billing_interval', 'month').strip()
+    plan.billing_interval = billing_interval if billing_interval in ('month', 'year') else 'month'
     plan.trial_days = int(request.form.get('trial_days', 0) or 0)
     plan.stripe_coupon_id = request.form.get('stripe_coupon_id', '').strip()
     db.session.commit()

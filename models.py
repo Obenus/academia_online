@@ -86,6 +86,7 @@ class SubscriptionPlan(db.Model):
     price_monthly_es = db.Column(db.Float, default=0.0)
     price_monthly_intl = db.Column(db.Float, default=0.0)
     price_yearly    = db.Column(db.Float, default=0.0)
+    billing_interval = db.Column(db.String(10), default='month')  # month | year
     stripe_price_id = db.Column(db.String(120), default='')
     stripe_price_id_es = db.Column(db.String(120), default='')
     stripe_price_id_intl = db.Column(db.String(120), default='')
@@ -96,12 +97,22 @@ class SubscriptionPlan(db.Model):
     sort_order      = db.Column(db.Integer, default=0)
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
 
+    @property
+    def is_yearly(self):
+        return (self.billing_interval or 'month') == 'year'
+
+    def price_suffix(self):
+        return '/año' if self.is_yearly else '/mes'
+
     def price_for_region(self, region='es'):
+        if self.is_yearly:
+            return self.price_yearly or 0.0
         if region == 'intl':
             return self.price_monthly_intl or self.price_monthly or 0.0
         return self.price_monthly_es or self.price_monthly or 0.0
 
     def stripe_price_for_region(self, region='es'):
+        """Price ID mensual por región. El anual se resuelve en el checkout vía stripe_price_id_yearly."""
         if region == 'intl':
             return self.stripe_price_id_intl or self.stripe_price_id or ''
         return self.stripe_price_id_es or self.stripe_price_id or ''
@@ -281,6 +292,7 @@ class SiteSettings(db.Model):
     backup_last_status    = db.Column(db.String(40), default='')
     backup_last_error     = db.Column(db.Text, default='')
     payments_enabled      = db.Column(db.Boolean, default=False)
+    payment_test_mode     = db.Column(db.Boolean, default=False)
     stripe_public_key     = db.Column(db.String(200), default='')
     stripe_secret_key_enc = db.Column(db.Text, default='')
     stripe_webhook_secret_enc = db.Column(db.Text, default='')

@@ -111,7 +111,7 @@
             <input type="radio" name="plan_id" value="{{ plan.id }}" class="mt-1 accent-violet-600"
                    {% if form.get('plan_id') == plan.id %}checked{% endif %} required/>
             <div>
-              <p class="font-semibold text-sm text-[#18181b]">{{ plan.name }} — {{ '%.2f'|format(plan.price_monthly) }} €/mes{% if plan.price_yearly %} · {{ '%.2f'|format(plan.price_yearly) }} €/año{% endif %}</p>
+              <p class="font-semibold text-sm text-[#18181b]">{{ plan.name }} — {{ '%.2f'|format(plan.price_for_region('es')) }} €{{ plan.price_suffix() }}</p>
               {% if plan.trial_days %}<p class="text-xs text-green-700">Prueba gratis {{ plan.trial_days }} días</p>{% endif %}
               {% if plan.description %}<p class="text-xs text-[#71717a] mt-0.5">{{ plan.description }}</p>{% endif %}
             </div>

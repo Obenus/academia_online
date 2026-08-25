@@ -69,6 +69,8 @@ def run_migrations(conn):
         "ALTER TABLE subscription_plan ADD COLUMN IF NOT EXISTS price_monthly_intl DOUBLE PRECISION DEFAULT 0",
         "ALTER TABLE subscription_plan ADD COLUMN IF NOT EXISTS stripe_price_id_es VARCHAR(120) DEFAULT ''",
         "ALTER TABLE subscription_plan ADD COLUMN IF NOT EXISTS stripe_price_id_intl VARCHAR(120) DEFAULT ''",
+        "ALTER TABLE subscription_plan ADD COLUMN IF NOT EXISTS billing_interval VARCHAR(10) DEFAULT 'month'",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS payment_test_mode BOOLEAN DEFAULT FALSE",
         'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS whatsapp_vip_pending BOOLEAN DEFAULT FALSE',
         "ALTER TABLE category ADD COLUMN IF NOT EXISTS slug VARCHAR(50) UNIQUE",
         "ALTER TABLE category ADD COLUMN IF NOT EXISTS is_system BOOLEAN DEFAULT FALSE",

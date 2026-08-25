@@ -40,9 +40,42 @@ def _payment_settings(app):
     return SiteSettings.query.first()
 
 
-def payments_enabled(app):
+def payment_test_mode(app):
     s = _payment_settings(app)
-    return bool(s and s.payments_enabled and get_stripe_secret(app))
+    return bool(s and getattr(s, 'payment_test_mode', False))
+
+
+def payments_enabled(app):
+    """Pagos activos: Stripe real o modo test (simulación sin cobro)."""
+    s = _payment_settings(app)
+    if not s or not s.payments_enabled:
+        return False
+    if payment_test_mode(app):
+        return True
+    return bool(get_stripe_secret(app))
+
+
+def checkout_ready(app):
+    """La landing puede mostrar el botón de compra."""
+    if not payments_enabled(app):
+        return False
+    if payment_test_mode(app):
+        return True
+    return bool(get_stripe_public(app) or get_stripe_secret(app))
+
+
+def as_plain_dict(obj):
+    """Convierte StripeObject/dict a dict plano (stripe-python >=8 no soporta .get())."""
+    if obj is None:
+        return {}
+    if hasattr(obj, 'to_dict'):
+        try:
+            return obj.to_dict()
+        except Exception:
+            pass
+    if isinstance(obj, dict):
+        return obj
+    return {}
 
 
 def _mail_env_defaults(app):
@@ -698,7 +731,8 @@ def send_admin_registration_email(app, mail, user, plan_name, status_label, plan
     academy = (s.academy_name if s and s.academy_name else None) or app.config.get('ACADEMY_NAME', 'Academia')
     if plan:
         price = plan.price_for_region('intl' if 'Internacional' in (region_label or '') else 'es')
-        plan_price = f'{price:.2f} €/mes'
+        suffix = plan.price_suffix() if hasattr(plan, 'price_suffix') else '/mes'
+        plan_price = f'{price:.2f} €{suffix}'
     else:
         plan_price = '—'
     created = user.created_at.strftime('%d/%m/%Y %H:%M') if user.created_at else '—'
@@ -935,11 +969,12 @@ def process_stripe_webhook_event(app, db, mail, event, notify_fn, *, finalize_re
     """Procesa eventos Stripe: renovaciones mensuales, impagos y bajas."""
     from models import User, SubscriptionPlan
 
-    etype = event['type']
-    data = event['data']['object']
+    event = as_plain_dict(event)
+    etype = event.get('type', '')
+    data = as_plain_dict((event.get('data') or {}).get('object'))
 
     if etype == 'checkout.session.completed' and data.get('mode') == 'subscription':
-        meta = data.get('metadata') or {}
+        meta = as_plain_dict(data.get('metadata'))
         if meta.get('checkout_intent_id') or not meta.get('user_id'):
             create_user_from_checkout_fn(app, mail, data, get_settings_fn)
         else:
@@ -952,6 +987,8 @@ def process_stripe_webhook_event(app, db, mail, event, notify_fn, *, finalize_re
                     finalize_registration_fn(user, plan, data)
                 else:
                     sub_ref = data.get('subscription')
+                    if isinstance(sub_ref, dict):
+                        sub_ref = sub_ref.get('id') or sub_ref
                     if sub_ref:
                         sync_stripe_subscription(app, user, sub_ref, mark_paid=True)
                         db.session.commit()
@@ -959,6 +996,8 @@ def process_stripe_webhook_event(app, db, mail, event, notify_fn, *, finalize_re
 
     if etype in ('invoice.payment_succeeded', 'invoice.paid'):
         sub_id = data.get('subscription')
+        if isinstance(sub_id, dict):
+            sub_id = sub_id.get('id')
         if not sub_id:
             return
         user = find_user_for_stripe_subscription(db.session, User, sub_id=sub_id, customer_id=data.get('customer'))
@@ -982,6 +1021,8 @@ def process_stripe_webhook_event(app, db, mail, event, notify_fn, *, finalize_re
 
     if etype == 'invoice.payment_failed':
         sub_id = data.get('subscription')
+        if isinstance(sub_id, dict):
+            sub_id = sub_id.get('id')
         user = find_user_for_stripe_subscription(db.session, User, sub_id=sub_id) if sub_id else None
         if user and user.billing_type != 'free':
             suspend_user_for_nonpayment(
@@ -1014,15 +1055,27 @@ def process_stripe_webhook_event(app, db, mail, event, notify_fn, *, finalize_re
         db.session.commit()
 
 
-def monthly_subscription_line_item(plan, *, region='es', interval='month'):
-    """Línea de checkout: suscripción recurrente mensual sin fecha de fin."""
+def plan_billing_interval(plan):
+    return 'year' if getattr(plan, 'billing_interval', 'month') == 'year' else 'month'
+
+
+def monthly_subscription_line_item(plan, *, region='es', interval=None):
+    """Línea de checkout: suscripción recurrente (mes o año según el plan)."""
+    if interval is None:
+        interval = plan_billing_interval(plan)
     interval = 'year' if interval == 'year' else 'month'
-    price_id = plan.stripe_price_for_region(region) if region in ('es', 'intl') else ''
     if interval == 'year':
-        price_id = plan.stripe_price_id_yearly or price_id
+        price_id = (getattr(plan, 'stripe_price_id_yearly', None) or '').strip()
         unit_price = plan.price_yearly or 0
     else:
-        unit_price = plan.price_for_region(region) if region in ('es', 'intl') else plan.price_monthly
+        price_id = plan.stripe_price_for_region(region) if region in ('es', 'intl') else ''
+        unit_price = (
+            (plan.price_monthly_intl or plan.price_monthly or 0)
+            if region == 'intl'
+            else (plan.price_monthly_es or plan.price_monthly or 0)
+        )
+        if region not in ('es', 'intl'):
+            unit_price = plan.price_monthly or 0
 
     line_item = {'quantity': 1}
     if price_id:
@@ -1087,12 +1140,14 @@ def create_public_subscription_checkout(app, plan, billing_region, success_url, 
     from models import db, CheckoutIntent
     stripe.api_key = get_stripe_secret(app)
     region = billing_region if billing_region in ('es', 'intl') else 'es'
-    line_item = monthly_subscription_line_item(plan, region=region, interval='month')
+    interval = plan_billing_interval(plan)
+    line_item = monthly_subscription_line_item(plan, region=region, interval=interval)
     sub_data = monthly_subscription_data(
         {
             'checkout_intent_id': str(checkout_intent_id),
             'plan_id': str(plan.id),
             'billing_region': region,
+            'billing_interval': interval,
         },
         trial_days=getattr(plan, 'trial_days', 0) or 0,
     )
@@ -1108,6 +1163,7 @@ def create_public_subscription_checkout(app, plan, billing_region, success_url, 
             'checkout_intent_id': str(checkout_intent_id),
             'plan_id': str(plan.id),
             'billing_region': region,
+            'billing_interval': interval,
         },
         subscription_data=sub_data,
     )
@@ -1116,6 +1172,29 @@ def create_public_subscription_checkout(app, plan, billing_region, success_url, 
         intent.stripe_session_id = session.id
         db.session.commit()
     return session
+
+
+def build_test_checkout_session(intent, plan, *, email, name, region='es'):
+    """Sesión falsa de Stripe para modo test (sin cobro real)."""
+    import secrets
+    sid = f'cs_test_mode_{intent.id}_{secrets.token_hex(8)}'
+    return {
+        'id': sid,
+        'object': 'checkout.session',
+        'mode': 'subscription',
+        'payment_status': 'paid',
+        'customer': f'cus_test_{intent.id}',
+        'subscription': f'sub_test_{intent.id}',
+        'customer_email': email,
+        'customer_details': {'email': email, 'name': name or ''},
+        'metadata': {
+            'checkout_intent_id': str(intent.id),
+            'plan_id': str(plan.id),
+            'billing_region': region,
+            'billing_interval': plan_billing_interval(plan),
+            'payment_test_mode': '1',
+        },
+    }
 
 
 def create_billing_portal_session(app, user, return_url):
