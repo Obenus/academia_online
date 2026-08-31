@@ -17,7 +17,7 @@
   }
   body { background: var(--conv-bg); color: var(--conv-text); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; line-height: 1.65; }
   .conv-accent { color: var(--conv-accent); }
-  .conv-header { background: var(--conv-card); border-bottom: 1px solid #ebe6e1; }
+  .conv-header { background: var(--conv-card); border-bottom: 1px solid #ebe6e1; position: sticky; top: 0; z-index: 50; }
   .conv-card { background: var(--conv-card); border: 1px solid #ebe6e1; border-radius: 20px; padding: 1.5rem; box-shadow: 0 8px 30px rgba(45,42,38,.06); }
   .conv-card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; text-align: center; }
   .conv-pill { display: inline-block; padding: 0.4rem 1rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; border: 1px solid #d4d0cb; background: #fff; color: var(--conv-muted); transition: .15s; }
@@ -38,6 +38,19 @@
   .conv-check li { list-style: none; display: flex; align-items: flex-start; margin-bottom: 0.5rem; }
   .conv-closing { text-align: center; padding: 2rem 0; }
   .conv-closing p { font-size: 1.15rem; font-weight: 600; margin: 0.25rem 0; }
+  .landing-html-body iframe {
+    max-width: 100%;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+    min-height: 220px;
+    border: 0;
+    border-radius: 1rem;
+    display: block;
+    margin: 1.25rem 0 1.75rem;
+    background: #000;
+  }
+  .landing-html-body img { max-width: 100%; height: auto; border-radius: 1rem; }
   .input { background: #fff; border: 1px solid #d4d0cb; border-radius: 10px; padding: 0.7rem 0.9rem; font-size: 0.9rem; width: 100%; outline: none; box-sizing: border-box; }
   .input:focus { border-color: var(--conv-accent); box-shadow: 0 0 0 3px var(--conv-accent-soft); }
   @media (min-width: 1024px) {
@@ -48,7 +61,7 @@
 </head>
 <body>
 
-<header class="conv-header px-4 py-3 flex items-center justify-between max-w-6xl mx-auto">
+<header class="conv-header sticky top-0 z-50 px-4 py-3 flex items-center justify-between max-w-6xl mx-auto">
   <div class="flex items-center gap-2 font-bold text-sm">
     {% if site.brand_logo_url %}
     <img src="{{ site.brand_logo_url }}" alt="" class="h-8" loading="eager" decoding="async" fetchpriority="high"/>
@@ -57,7 +70,9 @@
     {% endif %}
     {{ landing_text(site, 'landing_title') }}
   </div>
-  <a href="#acceso" class="text-sm font-semibold conv-accent">Ya tengo cuenta</a>
+  {# En móvil #acceso está oculto (sidebar); hay que ir a #acceso-mobile #}
+  <a href="#acceso" class="text-sm font-semibold conv-accent hidden lg:inline relative z-50">Ya tengo cuenta</a>
+  <a href="#acceso-mobile" class="text-sm font-semibold conv-accent lg:hidden relative z-50">Ya tengo cuenta</a>
 </header>
 
 <main class="max-w-6xl mx-auto px-4 py-8 lg:py-12">
@@ -73,103 +88,13 @@
 
   <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10 lg:items-start">
     <article>
-      <section class="conv-section">
-        <h1 class="conv-hero mb-6">{{ landing_text(site, 'landing_title') }}</h1>
-        {% with url=site.landing_video_after_title %}{% include 'public/_landing_video.html' %}{% endwith %}
-        <div class="conv-prose">
-          {% for p in landing_paragraphs(site, 'landing_hook') %}
-          <p class="{% if loop.index <= 4 %}lead{% endif %}">{{ p }}</p>
-          {% endfor %}
-        </div>
-      </section>
-
-      {% with url=site.landing_video_after_hook %}{% include 'public/_landing_video.html' %}{% endwith %}
-
-      <section class="conv-section conv-prose">
-        {% for p in landing_paragraphs(site, 'landing_intro') %}
-        <p>{{ p }}</p>
-        {% endfor %}
-      </section>
-
-      {% with url=site.landing_video_url %}{% include 'public/_landing_video.html' %}{% endwith %}
-
-      <section class="conv-section">
-        <h2>¿Qué es {{ landing_text(site, 'landing_title') }}?</h2>
-        <div class="conv-prose">
-          {% for p in landing_paragraphs(site, 'landing_what_is') %}
-          <p>{{ p }}</p>
-          {% endfor %}
-        </div>
-      </section>
-
-      {% with url=site.landing_video_after_what_is %}{% include 'public/_landing_video.html' %}{% endwith %}
+      <div class="landing-html-body">
+        {{ landing_body_html|safe }}
+      </div>
 
       <div class="lg:hidden conv-section" id="planes-mobile">
         {% include 'public/_landing_checkout.html' %}
       </div>
-
-      <section class="conv-section">
-        <h2>¿Cómo puede ayudarte?</h2>
-        <div class="conv-prose">
-          {% for p in landing_paragraphs(site, 'landing_how_helps') %}
-          <p>{{ p }}</p>
-          {% endfor %}
-        </div>
-      </section>
-
-      {% with url=site.landing_video_after_how_helps %}{% include 'public/_landing_video.html' %}{% endwith %}
-
-      <section class="conv-section">
-        <h2>Algunas de las preguntas que exploraremos juntas</h2>
-        <ul class="conv-list">
-          {% for line in landing_lines(site, 'landing_explore_questions') %}
-          <li><span class="ico">🤍</span><span>{{ line }}</span></li>
-          {% endfor %}
-        </ul>
-      </section>
-
-      {% with url=site.landing_video_after_explore %}{% include 'public/_landing_video.html' %}{% endwith %}
-
-      <section class="conv-section">
-        <h2>¿Qué encontrarás dentro?</h2>
-        <ul class="conv-list">
-          {% for line in landing_lines(site, 'landing_includes') %}
-          <li><span class="ico">🤍</span><span>{{ line }}</span></li>
-          {% endfor %}
-        </ul>
-      </section>
-
-      {% with url=site.landing_video_after_includes %}{% include 'public/_landing_video.html' %}{% endwith %}
-
-      <section class="conv-section conv-prose">
-        {% set closing_parts = landing_paragraphs(site, 'landing_closing') %}
-        {% if closing_parts %}
-        {% for line in closing_parts[0].split('\n') %}
-        <p class="{% if loop.last %}font-semibold{% endif %}">{{ line }}</p>
-        {% endfor %}
-        {% endif %}
-      </section>
-
-      <section class="conv-section">
-        <h2>Este círculo es para ti si…</h2>
-        <ul class="conv-check">
-          {% for line in landing_lines(site, 'landing_for_you') %}
-          <li>{{ line }}</li>
-          {% endfor %}
-        </ul>
-      </section>
-
-      {% with url=site.landing_video_after_for_you %}{% include 'public/_landing_video.html' %}{% endwith %}
-
-      <section class="conv-section conv-closing">
-        {% if closing_parts|length > 1 %}
-        {% for line in closing_parts[1].split('\n') %}
-        <p>{{ line }}</p>
-        {% endfor %}
-        {% endif %}
-      </section>
-
-      {% with url=site.landing_video_after_closing %}{% include 'public/_landing_video.html' %}{% endwith %}
     </article>
 
     <aside class="conv-sidebar space-y-5 hidden lg:block">

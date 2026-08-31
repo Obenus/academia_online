@@ -7,7 +7,7 @@
 <div class="admin-page-head flex flex-wrap items-start justify-between gap-3">
   <div>
     <h1>🌸 Landing principal</h1>
-    <p>Textos de la página de acceso y suscripción (<code>/login</code>)</p>
+    <p>Contenido HTML de la página de acceso y suscripción (<code>/login</code>)</p>
   </div>
   <a href="{{ url_for('login') }}" target="_blank" rel="noopener"
      class="text-sm font-semibold text-violet-600 hover:text-violet-800">Ver landing →</a>
@@ -17,104 +17,18 @@
   <form method="POST" class="space-y-5">
     {% include 'includes/csrf_field.html' %}
     <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Nombre / titular (cabecera)</label>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Nombre / titular (cabecera y pestaña)</label>
       <input type="text" name="landing_title" class="input" value="{{ s.landing_title or defaults.landing_title }}"/>
     </div>
 
     <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Vídeo tras el título / cabecera</label>
-      <input type="url" name="landing_video_after_title" class="input" value="{{ s.landing_video_after_title or '' }}" placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…"/>
-      <p class="text-[11px] mt-1" style="color:var(--text4)">Opcional. Si está vacío, no se muestra en la landing.</p>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Apertura — preguntas y «No estás perdida»</label>
-      <textarea name="landing_hook" class="input" rows="14">{{ s.landing_hook or defaults.landing_hook }}</textarea>
-      <p class="text-[11px] mt-1" style="color:var(--text4)">Párrafos separados por una línea en blanco.</p>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Vídeo tras la apertura</label>
-      <input type="url" name="landing_video_after_hook" class="input" value="{{ s.landing_video_after_hook or '' }}" placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…"/>
-      <p class="text-[11px] mt-1" style="color:var(--text4)">Opcional. Si está vacío, no se muestra en la landing.</p>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Por qué nació (mejores preguntas)</label>
-      <textarea name="landing_intro" class="input" rows="6">{{ s.landing_intro or defaults.landing_intro }}</textarea>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Vídeo tras «Por qué nació» (entre intro y ¿Qué es?)</label>
-      <input type="url" name="landing_video_url" class="input" value="{{ s.landing_video_url or '' }}" placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…"/>
-      <p class="text-[11px] mt-1" style="color:var(--text4)">Opcional. Si está vacío, no se muestra en la landing.</p>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">¿Qué es? (no es terapia, es un círculo…)</label>
-      <textarea name="landing_what_is" class="input" rows="8">{{ s.landing_what_is or defaults.landing_what_is }}</textarea>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Vídeo tras «¿Qué es?»</label>
-      <input type="url" name="landing_video_after_what_is" class="input" value="{{ s.landing_video_after_what_is or '' }}" placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…"/>
-      <p class="text-[11px] mt-1" style="color:var(--text4)">Opcional. Si está vacío, no se muestra en la landing.</p>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">¿Cómo puede ayudarte?</label>
-      <textarea name="landing_how_helps" class="input" rows="7">{{ s.landing_how_helps or defaults.landing_how_helps }}</textarea>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Vídeo tras «¿Cómo puede ayudarte?»</label>
-      <input type="url" name="landing_video_after_how_helps" class="input" value="{{ s.landing_video_after_how_helps or '' }}" placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…"/>
-      <p class="text-[11px] mt-1" style="color:var(--text4)">Opcional. Si está vacío, no se muestra en la landing.</p>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Preguntas que exploraremos (una por línea)</label>
-      <textarea name="landing_explore_questions" class="input" rows="7">{{ s.landing_explore_questions or defaults.landing_explore_questions }}</textarea>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Vídeo tras «Preguntas que exploraremos»</label>
-      <input type="url" name="landing_video_after_explore" class="input" value="{{ s.landing_video_after_explore or '' }}" placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…"/>
-      <p class="text-[11px] mt-1" style="color:var(--text4)">Opcional. Si está vacío, no se muestra en la landing.</p>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">¿Qué encontrarás dentro? (una por línea)</label>
-      <textarea name="landing_includes" class="input" rows="7">{{ s.landing_includes or defaults.landing_includes }}</textarea>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Vídeo tras «¿Qué encontrarás dentro?»</label>
-      <input type="url" name="landing_video_after_includes" class="input" value="{{ s.landing_video_after_includes or '' }}" placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…"/>
-      <p class="text-[11px] mt-1" style="color:var(--text4)">Opcional. Si está vacío, no se muestra en la landing.</p>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Este círculo es para ti si… (una por línea)</label>
-      <textarea name="landing_for_you" class="input" rows="7">{{ s.landing_for_you or defaults.landing_for_you }}</textarea>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Vídeo tras «Este círculo es para ti si…»</label>
-      <input type="url" name="landing_video_after_for_you" class="input" value="{{ s.landing_video_after_for_you or '' }}" placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…"/>
-      <p class="text-[11px] mt-1" style="color:var(--text4)">Opcional. Si está vacío, no se muestra en la landing.</p>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Cierre emocional</label>
-      <textarea name="landing_closing" class="input" rows="5">{{ s.landing_closing or defaults.landing_closing }}</textarea>
-      <p class="text-[11px] mt-1" style="color:var(--text4)">Dos bloques separados por línea en blanco: mensaje + «Tu ratito…»</p>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Vídeo tras el cierre emocional</label>
-      <input type="url" name="landing_video_after_closing" class="input" value="{{ s.landing_video_after_closing or '' }}" placeholder="https://www.youtube.com/watch?v=… o https://vimeo.com/…"/>
-      <p class="text-[11px] mt-1" style="color:var(--text4)">Opcional. Si está vacío, no se muestra en la landing.</p>
+      <label class="block text-xs font-medium mb-1" style="color:var(--text3)">Contenido principal (HTML)</label>
+      <textarea name="landing_body_html" class="input font-mono text-sm" rows="28">{{ s.landing_body_html or defaults.landing_body_html }}</textarea>
+      <p class="text-[11px] mt-1" style="color:var(--text4)">
+        Un solo bloque HTML: títulos, párrafos, listas e <code>&lt;iframe&gt;</code> de YouTube/Vimeo.
+        Ejemplo de vídeo:
+        <code class="block mt-1 whitespace-pre-wrap text-[10px] opacity-80">&lt;iframe src="https://www.youtube.com/embed/VIDEO_ID" title="Vídeo" width="100%" height="360" allowfullscreen&gt;&lt;/iframe&gt;</code>
+      </p>
     </div>
 
     <div class="grid sm:grid-cols-2 gap-4">
@@ -159,8 +73,8 @@
       <button type="submit" class="btn btn-primary flex-1 justify-center">Guardar landing</button>
       <button type="submit" name="action" value="reset"
               class="btn btn-secondary flex-1 justify-center"
-              onclick="return confirm('¿Restaurar todos los textos al contenido original del PDF?')">
-        Restaurar textos del PDF
+              onclick="return confirm('¿Restaurar el HTML al contenido original?')">
+        Restaurar contenido original
       </button>
     </div>
   </form>

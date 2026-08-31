@@ -318,6 +318,7 @@ class SiteSettings(db.Model):
     landing_includes             = db.Column(db.Text, default='')
     landing_for_you              = db.Column(db.Text, default='')
     landing_closing              = db.Column(db.Text, default='')
+    landing_body_html            = db.Column(db.Text, default='')
     landing_cta_text             = db.Column(db.String(120), default='')
     landing_price_note           = db.Column(db.String(200), default='')
     landing_login_title          = db.Column(db.String(200), default='')

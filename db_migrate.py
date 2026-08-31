@@ -136,6 +136,7 @@ def run_migrations(conn):
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_includes TEXT DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_for_you TEXT DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_closing TEXT DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_body_html TEXT DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_cta_text VARCHAR(120) DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_price_note VARCHAR(200) DEFAULT ''",
         "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_title VARCHAR(200) DEFAULT ''",

@@ -28,9 +28,10 @@ from geo_utils import detect_billing_region, billing_region_label
 from n8n_notify import notify_n8n_pregunta
 from registration import create_user_from_checkout
 from landing_content import (
-    LANDING_DEFAULTS, LANDING_FORM_FIELDS, LANDING_VIDEO_FIELDS,
-    landing_text, landing_paragraphs, landing_lines,
+    LANDING_DEFAULTS, LANDING_FORM_FIELDS,
+    landing_text, ensure_landing_body_html,
 )
+from html_sanitize import sanitize_landing_html
 from spain_provinces import (
     SPANISH_PROVINCES, CITY_OTHER_VALUE, CITY_OTHER_LABEL,
     parse_city_from_form, city_form_state, city_form_from_request,
@@ -329,11 +330,14 @@ def admin_required(f):
 
 def _conversion_landing_context():
     site = get_settings()
+    if ensure_landing_body_html(site):
+        db.session.commit()
     region = detect_billing_region('es')
     plans = SubscriptionPlan.query.filter_by(is_active=True).order_by(
         SubscriptionPlan.sort_order, SubscriptionPlan.id
     ).all()
     test_mode = payment_test_mode(app)
+    body_raw = (getattr(site, 'landing_body_html', None) or '').strip() or LANDING_DEFAULTS.get('landing_body_html', '')
     return dict(
         site=site,
         plans=plans,
@@ -343,8 +347,7 @@ def _conversion_landing_context():
         checkout_ready=checkout_ready(app),
         payment_test_mode=test_mode,
         landing_text=landing_text,
-        landing_paragraphs=landing_paragraphs,
-        landing_lines=landing_lines,
+        landing_body_html=sanitize_landing_html(body_raw),
     )
 
 
@@ -1461,22 +1464,29 @@ def admin_settings():
 @admin_required
 def admin_landing():
     s = get_settings()
+    migrated = ensure_landing_body_html(s)
     if request.method == 'POST':
         if request.form.get('action') == 'reset':
             for field in LANDING_FORM_FIELDS:
                 if hasattr(s, field):
                     setattr(s, field, LANDING_DEFAULTS.get(field, ''))
-            flash('Textos restaurados al contenido original del PDF.', 'success')
+            flash('Textos restaurados al contenido original.', 'success')
         else:
             for field in LANDING_FORM_FIELDS:
-                if hasattr(s, field):
-                    setattr(s, field, request.form.get(field, '').strip())
+                if not hasattr(s, field):
+                    continue
+                raw = request.form.get(field, '')
+                if field == 'landing_body_html':
+                    setattr(s, field, str(sanitize_landing_html(raw)))
+                else:
+                    setattr(s, field, raw.strip())
             flash('Landing principal guardada.', 'success')
         db.session.commit()
         return redirect(url_for('admin_landing'))
+    if migrated:
+        db.session.commit()
     return render_template(
         'admin/landing.html', s=s, defaults=LANDING_DEFAULTS, fields=LANDING_FORM_FIELDS,
-        video_fields=LANDING_VIDEO_FIELDS,
     )
 
 
@@ -4928,6 +4938,7 @@ else:
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_includes TEXT DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_for_you TEXT DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_closing TEXT DEFAULT ''"))
+                conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_body_html TEXT DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_cta_text VARCHAR(120) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_price_note VARCHAR(200) DEFAULT ''"))
                 conn.execute(text("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS landing_login_title VARCHAR(200) DEFAULT ''"))
